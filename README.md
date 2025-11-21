@@ -16,7 +16,7 @@ SubliminalGen is a full-stack iOS + FastAPI application that enables users to cr
         ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │ Local Cache     │    │ AI Services     │    │ Semantic Cache  │
-│ (Free Tier)     │    │ 11Labs + Video  │    │ (Embeddings)    │
+│ (Free Tier)     │    │ gemini music API│    │ (Embeddings)    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
