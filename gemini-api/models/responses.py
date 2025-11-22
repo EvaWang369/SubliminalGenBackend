@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 
 class GenerationResponse(BaseModel):
@@ -12,9 +12,10 @@ class GenerationResponse(BaseModel):
 class UserCreation(BaseModel):
     id: str
     title: str
-    voice_url: Optional[str]
+    voice_url: Optional[str] = None
     combined_url: str
-    created_at: datetime
+    created_at: Union[datetime, str]
+    music_id: Optional[str] = None
 
 class LibraryResponse(BaseModel):
     creations: List[UserCreation]

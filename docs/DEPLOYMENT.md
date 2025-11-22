@@ -20,14 +20,7 @@
    SUPABASE_URL=your_supabase_url
    SUPABASE_KEY=your_supabase_anon_key
    SUPABASE_SERVICE_KEY=your_service_key
-   AWS_ACCESS_KEY_ID=your_aws_key
-   AWS_SECRET_ACCESS_KEY=your_aws_secret
-   AWS_REGION=us-east-1
-   S3_BUCKET_NAME=subliminal-gen
-   ELEVENLABS_API_KEY=your_elevenlabs_key
-   OPENAI_API_KEY=your_openai_key
-   ENVIRONMENT=production
-   DEBUG=false
+   GOOGLE_API_KEY=your_google_api_key
    ```
 
 4. **Deploy**
