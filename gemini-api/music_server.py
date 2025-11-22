@@ -75,7 +75,9 @@ async def generate_music_direct(request: MusicGenerateRequest):
         with open(file_path, "wb") as f:
             f.write(audio_data)
         
-        file_url = f"http://0.0.0.0:8001/files/{file_id}.wav"
+        # Get the base URL from environment or use localhost for development
+        base_url = os.getenv("BASE_URL", "http://0.0.0.0:8001")
+        file_url = f"{base_url}/files/{file_id}.wav"
         
         return GenerationResponse(
             id=file_id,
