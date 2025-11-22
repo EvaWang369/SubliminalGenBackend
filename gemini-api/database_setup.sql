@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS music (
     title TEXT NOT NULL,
     tag TEXT NOT NULL DEFAULT 'meditation',
     supabase_url TEXT NOT NULL,
+    cache_key TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -31,4 +32,5 @@ CREATE TABLE IF NOT EXISTS music_users (
 
 -- Indexes for music tables
 CREATE INDEX IF NOT EXISTS idx_music_tag_uuid ON music (tag, uuid);
+CREATE INDEX IF NOT EXISTS idx_music_cache_key ON music (cache_key);
 CREATE INDEX IF NOT EXISTS idx_music_users_user_id ON music_users (user_id);

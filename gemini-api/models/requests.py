@@ -1,11 +1,17 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class MusicGenerateRequest(BaseModel):
     prompt: str
-    duration: int  # seconds
+    tag: str = "meditation"  # Frontend sends this directly
+    duration: int = 30  # seconds, default to 30
+    is_vip: bool = False  # VIP status for duration control
+    music_type: Optional[List[str]] = None
+    instruments: Optional[List[str]] = None
+    mood: Optional[List[str]] = None
+    frequencies: Optional[List[str]] = None
+    # Legacy fields
     style: Optional[str] = "ambient"
-    mood: Optional[str] = "calm"
 
 class VideoGenerateRequest(BaseModel):
     prompt: str

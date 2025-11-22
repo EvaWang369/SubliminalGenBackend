@@ -40,14 +40,17 @@ music_generator = LyriaMusic()
 async def root():
     return {"message": "SubliminalGen API", "version": "1.0.0", "status": "suno-only"}
 
-@app.get("/api/music/{user_id}")
-async def get_music_for_user(user_id: str, tag: str = "meditation"):
-    """Get music track for user with caching"""
+@app.post("/api/music/{user_id}")
+async def generate_music_for_user(user_id: str, request: MusicGenerateRequest):
+    """Unified endpoint - handles both simple and enhanced requests"""
     try:
-        print(f"🎵 Getting {tag} music for user: {user_id}")
+        print(f"🎵 Generating music for user: {user_id}")
+        print(f"📝 Request: {request.prompt} (tag: {request.tag})")
         
-        result = await music_service.get_music_for_user(user_id, tag)
-        
+        # Always use enhanced mode (handles both simple and enhanced requests)
+        print(f"🎆 Enhanced mode (hybrid caching)")
+        result = await music_service.get_music_with_enhanced_prompt(user_id, request)
+
         status = "from cache" if result['cached'] else "newly generated"
         print(f"✅ Music {status}: {result['url']}")
         
@@ -62,11 +65,18 @@ async def get_music_for_user(user_id: str, tag: str = "meditation"):
 
 @app.post("/api/music/generate", response_model=GenerationResponse)
 async def generate_music_direct(request: MusicGenerateRequest):
-    """Direct music generation (legacy endpoint)"""
+    """Direct music generation with enhanced prompts (local storage)"""
     try:
-        print(f"🎵 Direct generation: {request.prompt}")
+        # Enhance prompt with iOS parameters
+        enhanced_prompt = music_service.enhance_prompt(
+            request.prompt, request.music_type,
+            request.instruments, request.mood, request.frequencies
+        )
         
-        audio_data = await music_generator.generate_music(request.prompt, request.duration)
+        print(f"🎵 Direct generation with enhanced prompt: {enhanced_prompt}")
+        
+        # Generate with enhanced prompt and tag-based config
+        audio_data = await music_generator.generate_music_with_config(enhanced_prompt, request.tag)
         
         # Save to local file
         file_id = str(uuid.uuid4())
