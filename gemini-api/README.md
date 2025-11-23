@@ -237,3 +237,38 @@ curl -X POST http://localhost:8001/api/music/550e8400-e29b-41d4-a716-44665544000
   }'
 
 ```
+https://ai.google.dev/gemini-api/docs/music-generation?utm_source=deepmind.google&utm_medium=referral&utm_campaign=gdm&utm_content
+
+VIP User Test (60s duration):
+```
+curl -X POST https://subliminalgenbackend.onrender.com/api/music/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "relaxing piano music",
+    "tag": "meditation",
+    "duration": 60,
+    "is_vip": true,
+    "music_type": ["ambient"],
+    "instruments": ["piano"],
+    "mood": ["calm"]
+  }'
+```
+
+Free User Test (30s duration cap):
+```
+curl -X POST https://subliminalgenbackend.onrender.com/api/music/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "energetic workout music",
+    "tag": "energy",
+    "duration": 90,
+    "is_vip": false
+  }'
+```
+
+Health Check:
+```
+curl https://subliminalgenbackend.onrender.com/
+
+```
+
