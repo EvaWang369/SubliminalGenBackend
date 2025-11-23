@@ -43,22 +43,15 @@ class MusicService:
         """Create hash from all parameters that affect output"""
         import hashlib
         
-        try:
-            # Enhanced prompt
-            enhanced_prompt = self.enhance_prompt(
-                request.prompt, request.music_type, 
-                request.instruments, request.mood, request.frequencies
-            )
-            
-            # Include tag in cache key
-            cache_string = f"{enhanced_prompt}:{request.tag}"
-            cache_key = hashlib.md5(cache_string.encode()).hexdigest()
-            print(f"🔑 Generated cache key: {cache_key} from: {cache_string}")
-            return cache_key
-        except Exception as e:
-            print(f"❌ Cache key generation failed: {str(e)}")
-            # Fallback to simple hash
-            return hashlib.md5(f"{request.prompt}:{request.tag}".encode()).hexdigest()
+        # Enhanced prompt
+        enhanced_prompt = self.enhance_prompt(
+            request.prompt, request.music_type, 
+            request.instruments, request.mood, request.frequencies
+        )
+        
+        # Include tag in cache key
+        cache_string = f"{enhanced_prompt}:{request.tag}"
+        return hashlib.md5(cache_string.encode()).hexdigest()
     
     async def get_music_with_enhanced_prompt(self, user_id: str, request):
         """Generate music with enhanced prompt and hybrid caching"""
