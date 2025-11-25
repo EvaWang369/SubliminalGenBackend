@@ -38,3 +38,9 @@ class SignInRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     id_token: str
+
+class VIPStatusRequest(BaseModel):
+    user_id: str
+    is_vip: bool
+    transaction_id: str
+    subscription_type: Optional[str] = "monthly"  # monthly, yearly

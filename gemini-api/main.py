@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from services.music_service import MusicService
 from services.lyria_music import LyriaMusic
 from services.auth_service import AuthService
-from models.requests import MusicGenerateRequest, SignUpRequest, SignInRequest, GoogleAuthRequest
+from models.requests import MusicGenerateRequest, SignUpRequest, SignInRequest, GoogleAuthRequest, VIPStatusRequest
 from models.responses import GenerationResponse, LibraryResponse, UserCreation, AuthResponse
 
 load_dotenv()
@@ -72,10 +72,13 @@ async def sign_up(request: SignUpRequest):
             password=request.password,
             name=request.name
         )
+        print(f"✅ Signup success: {request.email} -> {user_data['id']}")
         return AuthResponse(**user_data)
     except ValueError as e:
+        print(f"❌ Signup failed: {request.email} - {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"💥 Signup error: {request.email} - {str(e)}")
         raise HTTPException(status_code=500, detail=f"Sign up failed: {str(e)}")
 
 
@@ -87,10 +90,13 @@ async def sign_in(request: SignInRequest):
             email=request.email,
             password=request.password
         )
+        print(f"✅ Signin success: {request.email} -> {user_data['id']}")
         return AuthResponse(**user_data)
     except ValueError as e:
+        print(f"❌ Signin failed: {request.email} - {str(e)}")
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
+        print(f"💥 Signin error: {request.email} - {str(e)}")
         raise HTTPException(status_code=500, detail=f"Sign in failed: {str(e)}")
 
 
@@ -99,11 +105,46 @@ async def sign_in_with_google(request: GoogleAuthRequest):
     """Authenticate user with Google ID token"""
     try:
         user_data = await auth_service.sign_in_with_google(request.id_token)
+        print(f"✅ Google signin success: {user_data['email']} -> {user_data['id']}")
         return AuthResponse(**user_data)
     except ValueError as e:
+        print(f"❌ Google signin failed: {str(e)}")
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
+        print(f"💥 Google signin error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Google sign in failed: {str(e)}")
+
+
+@app.post("/user/vip-status", response_model=AuthResponse)
+async def update_vip_status(request: VIPStatusRequest):
+    """Update user VIP status after in-app purchase"""
+    try:
+        user_data = await auth_service.update_vip_status(
+            user_id=request.user_id,
+            is_vip=request.is_vip,
+            transaction_id=request.transaction_id,
+            subscription_type=request.subscription_type
+        )
+        print(f"✅ VIP UPGRADE: {request.user_id} -> VIP: {request.is_vip} | Type: {request.subscription_type} | Transaction: {request.transaction_id} | End: {user_data.get('vip_end_date', 'N/A')}")
+        return AuthResponse(**user_data)
+    except ValueError as e:
+        print(f"❌ VIP UPGRADE FAILED: {request.user_id} | Transaction: {request.transaction_id} | Error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"💥 VIP UPGRADE ERROR: {request.user_id} | Transaction: {request.transaction_id} | Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"VIP update failed: {str(e)}")
+
+
+@app.get("/user/profile/{user_id}", response_model=AuthResponse)
+async def get_user_profile(user_id: str):
+    """Get user profile with current VIP status"""
+    try:
+        user_data = await auth_service.get_user_profile(user_id)
+        return AuthResponse(**user_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Get profile failed: {str(e)}")
 
 
 # ---------------------------------------------------

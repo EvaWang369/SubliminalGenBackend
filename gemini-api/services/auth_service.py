@@ -28,7 +28,7 @@ class AuthService:
             if existing.data:
                 raise ValueError("User already exists")
 
-            # Create user
+            # Create user (let database generate user_id)
             user_data = {
                 "email": email,
                 "password_hash": self.hash_password(password),
@@ -93,7 +93,7 @@ class AuthService:
                 # Existing user
                 user = result.data[0]
             else:
-                # Create new user
+                # Create new user (let database generate user_id)
                 user_data = {
                     "email": email,
                     "name": name,
@@ -115,3 +115,73 @@ class AuthService:
             
         except Exception as e:
             raise ValueError(f"Google sign in failed: {str(e)}")
+
+    async def update_vip_status(self, user_id: str, is_vip: bool, transaction_id: str, subscription_type: str = "monthly") -> Dict[str, Any]:
+        """Update user VIP status after in-app purchase"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # Calculate VIP end date
+            vip_start = datetime.now()
+            if subscription_type == "yearly":
+                vip_end = vip_start + timedelta(days=365)
+            else:  # monthly
+                vip_end = vip_start + timedelta(days=30)
+            
+            update_data = {
+                "is_vip": is_vip,
+                "vip_start_date": vip_start.isoformat() if is_vip else None,
+                "vip_end_date": vip_end.isoformat() if is_vip else None,
+                "transaction_id": transaction_id if is_vip else None
+            }
+            
+            result = self.supabase.from_("music_users").update(update_data).eq("user_id", user_id).execute()
+            
+            if not result.data:
+                raise ValueError("User not found")
+                
+            user = result.data[0]
+            return {
+                "id": user["user_id"],
+                "email": user["email"],
+                "name": user["name"],
+                "isVIP": user["is_vip"],
+                "vip_end_date": user.get("vip_end_date")
+            }
+            
+        except Exception as e:
+            raise ValueError(f"VIP status update failed: {str(e)}")
+
+    async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
+        """Get user profile with current VIP status"""
+        try:
+            from datetime import datetime
+            
+            result = self.supabase.from_("music_users").select("*").eq("user_id", user_id).execute()
+            
+            if not result.data:
+                raise ValueError("User not found")
+                
+            user = result.data[0]
+            
+            # Check if VIP has expired
+            is_vip = user.get("is_vip", False)
+            vip_end_date = user.get("vip_end_date")
+            
+            if is_vip and vip_end_date:
+                end_date = datetime.fromisoformat(vip_end_date.replace('Z', '+00:00'))
+                if datetime.now() > end_date:
+                    # VIP expired, update database
+                    self.supabase.from_("music_users").update({"is_vip": False}).eq("user_id", user_id).execute()
+                    is_vip = False
+            
+            return {
+                "id": user["user_id"],
+                "email": user["email"],
+                "name": user["name"],
+                "isVIP": is_vip,
+                "vip_end_date": vip_end_date
+            }
+            
+        except Exception as e:
+            raise ValueError(f"Get user profile failed: {str(e)}")

@@ -41,3 +41,16 @@ CREATE INDEX IF NOT EXISTS idx_music_tag_uuid ON music (tag, uuid);
 CREATE INDEX IF NOT EXISTS idx_music_cache_key ON music (cache_key);
 CREATE INDEX IF NOT EXISTS idx_music_users_user_id ON music_users (user_id);
 CREATE INDEX IF NOT EXISTS idx_music_users_email ON music_users (email);
+
+-- Fix music_users table to ensure user_id has UUID default
+ALTER TABLE music_users ALTER COLUMN user_id SET DEFAULT gen_random_uuid();
+
+-- If user_id is currently TEXT, convert to UUID
+-- (Run this only if needed - check your current schema first)
+-- ALTER TABLE music_users ALTER COLUMN user_id TYPE UUID USING user_id::UUID;
+
+-- Add VIP tracking columns to music_users table
+ALTER TABLE music_users
+ADD COLUMN IF NOT EXISTS vip_start_date TIMESTAMP,
+ADD COLUMN IF NOT EXISTS vip_end_date TIMESTAMP,
+ADD COLUMN IF NOT EXISTS transaction_id TEXT;
