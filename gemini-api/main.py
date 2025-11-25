@@ -123,9 +123,10 @@ async def update_vip_status(request: VIPStatusRequest):
             user_id=request.user_id,
             is_vip=request.is_vip,
             transaction_id=request.transaction_id,
-            subscription_type=request.subscription_type
+            subscription_type=request.subscription_type,
+            subscription_duration_days=request.subscription_duration_days
         )
-        print(f"✅ VIP UPGRADE: {request.user_id} -> VIP: {request.is_vip} | Type: {request.subscription_type} | Transaction: {request.transaction_id} | End: {user_data.get('vip_end_date', 'N/A')}")
+        print(f"✅ VIP UPGRADE: {request.user_id} -> VIP: {request.is_vip} | Type: {request.subscription_type} | Days: {request.subscription_duration_days} | Transaction: {request.transaction_id} | End: {user_data.get('vip_end_date', 'N/A')}")
         return AuthResponse(**user_data)
     except ValueError as e:
         print(f"❌ VIP UPGRADE FAILED: {request.user_id} | Transaction: {request.transaction_id} | Error: {str(e)}")
