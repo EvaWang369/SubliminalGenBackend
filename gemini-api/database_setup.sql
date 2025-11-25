@@ -23,14 +23,21 @@ CREATE TABLE IF NOT EXISTS music (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Music users tracking table (if not exists)
+-- Music users tracking table (extended for authentication)
 CREATE TABLE IF NOT EXISTS music_users (
-    user_id TEXT PRIMARY KEY,
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT UNIQUE,
+    password_hash TEXT,
+    name TEXT,
+    is_vip BOOLEAN DEFAULT FALSE,
+    google_id TEXT,
     last_received_uuid TEXT,
-    last_received_timestamp TIMESTAMP DEFAULT NOW()
+    last_received_timestamp TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Indexes for music tables
 CREATE INDEX IF NOT EXISTS idx_music_tag_uuid ON music (tag, uuid);
 CREATE INDEX IF NOT EXISTS idx_music_cache_key ON music (cache_key);
 CREATE INDEX IF NOT EXISTS idx_music_users_user_id ON music_users (user_id);
+CREATE INDEX IF NOT EXISTS idx_music_users_email ON music_users (email);

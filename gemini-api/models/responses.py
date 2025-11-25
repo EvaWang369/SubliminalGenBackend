@@ -24,3 +24,9 @@ class LibraryResponse(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         self.total = len(self.creations)
+
+class AuthResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    isVIP: bool = False

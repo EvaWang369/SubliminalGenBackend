@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 
 from services.music_service import MusicService
 from services.lyria_music import LyriaMusic
-from models.requests import MusicGenerateRequest
-from models.responses import GenerationResponse, LibraryResponse, UserCreation
+from services.auth_service import AuthService
+from models.requests import MusicGenerateRequest, SignUpRequest, SignInRequest, GoogleAuthRequest
+from models.responses import GenerationResponse, LibraryResponse, UserCreation, AuthResponse
 
 load_dotenv()
 
@@ -37,12 +38,14 @@ uploads_dir.mkdir(exist_ok=True)
 app.mount("/files", StaticFiles(directory="uploads"), name="files")
 
 BASE_URL = os.getenv("BASE_URL", "http://0.0.0.0:8001")
+PORT = int(os.getenv("PORT", 8001))
 
 # ---------------------------------------------------
 # SERVICES
 # ---------------------------------------------------
 music_service = MusicService()
 music_generator = LyriaMusic()
+auth_service = AuthService()
 
 
 # ---------------------------------------------------
@@ -55,6 +58,52 @@ async def root():
         "version": "1.0.0",
         "status": "suno-only",
     }
+
+
+# ---------------------------------------------------
+# AUTHENTICATION
+# ---------------------------------------------------
+@app.post("/auth/signup", response_model=AuthResponse)
+async def sign_up(request: SignUpRequest):
+    """Create new user account"""
+    try:
+        user_data = await auth_service.sign_up(
+            email=request.email,
+            password=request.password,
+            name=request.name
+        )
+        return AuthResponse(**user_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sign up failed: {str(e)}")
+
+
+@app.post("/auth/signin", response_model=AuthResponse)
+async def sign_in(request: SignInRequest):
+    """Authenticate user with email/password"""
+    try:
+        user_data = await auth_service.sign_in(
+            email=request.email,
+            password=request.password
+        )
+        return AuthResponse(**user_data)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sign in failed: {str(e)}")
+
+
+@app.post("/auth/google", response_model=AuthResponse)
+async def sign_in_with_google(request: GoogleAuthRequest):
+    """Authenticate user with Google ID token"""
+    try:
+        user_data = await auth_service.sign_in_with_google(request.id_token)
+        return AuthResponse(**user_data)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Google sign in failed: {str(e)}")
 
 
 # ---------------------------------------------------
@@ -267,7 +316,7 @@ async def combine_audio(
     try:
         # Convert string to boolean
         is_vip_bool = is_vip.lower() in ("true", "1", "yes")
-        
+
         print("📥 /api/audio/combine called")
         print(f"   music_id = {music_id}")
         print(f"   user_id  = {user_id}")

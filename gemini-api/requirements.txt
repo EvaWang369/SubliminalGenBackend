@@ -11,6 +11,9 @@ httpx>=0.26.0
 # Google Gemini/Lyria AI
 google-genai>=1.47.0
 
+# Google OAuth2 for authentication
+google-auth>=2.16.0
+
 # Supabase database client
 supabase>=2.0.2
 

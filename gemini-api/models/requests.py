@@ -26,3 +26,15 @@ class CombineRequest(BaseModel):
     user_id: Optional[str] = None
     is_vip: bool = False
     title: Optional[str] = None
+
+class SignUpRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+class SignInRequest(BaseModel):
+    email: str
+    password: str
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str
