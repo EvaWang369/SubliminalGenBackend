@@ -137,6 +137,7 @@ async def generate_music_direct(request: MusicGenerateRequest):
 @app.post("/api/audio/upload")
 async def upload_combined_audio(
     combined_file: UploadFile = File(...),
+    music_id: str = None,
     user_id: str = None,
     is_vip: str = "false",
     title: str = None,
@@ -155,6 +156,7 @@ async def upload_combined_audio(
         is_vip_bool = is_vip.lower() in ("true", "1", "yes")
 
         print("📥 /api/audio/upload called")
+        print(f"   music_id  = {music_id}")
         print(f"   user_id   = {user_id}")
         print(f"   is_vip    = {is_vip} -> {is_vip_bool}")
         print(f"   title     = {title}")
@@ -192,7 +194,7 @@ async def upload_combined_audio(
                     "title": creation_title,
                     "voice_url": None,
                     "combined_url": cloud_url,
-                    "music_id": None,
+                    "music_id": music_id,
                     "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 }
 
