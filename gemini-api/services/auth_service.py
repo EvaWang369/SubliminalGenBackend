@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 class AuthService:
     def __init__(self):
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
         
         if not supabase_url or not supabase_key:
             raise ValueError("Missing Supabase credentials")
