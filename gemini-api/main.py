@@ -138,7 +138,7 @@ async def generate_music_direct(request: MusicGenerateRequest):
 async def upload_combined_audio(
     combined_file: UploadFile = File(...),
     user_id: str = None,
-    is_vip: bool = False,
+    is_vip: str = "false",
     title: str = None,
 ):
     """
@@ -150,10 +150,13 @@ async def upload_combined_audio(
     try:
         if not user_id:
             raise HTTPException(status_code=400, detail="user_id is required")
+        
+        # Convert string to boolean
+        is_vip_bool = is_vip.lower() in ("true", "1", "yes")
 
         print("📥 /api/audio/upload called")
         print(f"   user_id   = {user_id}")
-        print(f"   is_vip    = {is_vip}")
+        print(f"   is_vip    = {is_vip} -> {is_vip_bool}")
         print(f"   title     = {title}")
         print(f"   filename  = {combined_file.filename}")
 
@@ -164,7 +167,7 @@ async def upload_combined_audio(
         file_id = str(uuid.uuid4())
 
         # ---------------- VIP FLOW: store in Supabase + DB ----------------
-        if is_vip:
+        if is_vip_bool:
             try:
                 file_path = f"vip/{user_id}/{file_id}.wav"
                 print(f"☁️ Uploading to Supabase path: {file_path}")
@@ -253,7 +256,7 @@ async def combine_audio(
     voice_file: UploadFile = File(...),
     music_id: str = None,
     user_id: str = None,
-    is_vip: bool = False,
+    is_vip: str = "false",
     title: str = None,
 ):
     """
@@ -262,10 +265,13 @@ async def combine_audio(
     For now: mock combination – just saves the voice as combined file.
     """
     try:
+        # Convert string to boolean
+        is_vip_bool = is_vip.lower() in ("true", "1", "yes")
+        
         print("📥 /api/audio/combine called")
         print(f"   music_id = {music_id}")
         print(f"   user_id  = {user_id}")
-        print(f"   is_vip   = {is_vip}")
+        print(f"   is_vip   = {is_vip} -> {is_vip_bool}")
         print(f"   title    = {title}")
         print(f"   filename = {voice_file.filename}")
 
@@ -289,7 +295,7 @@ async def combine_audio(
         print(f"   URL: {file_url}")
 
         # VIP: store in DB
-        if is_vip and user_id:
+        if is_vip_bool and user_id:
             creation_title = title or f"Creation {int(time.time())}"
             creation_data = {
                 "user_id": user_id,
