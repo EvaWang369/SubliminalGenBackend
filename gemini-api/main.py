@@ -102,6 +102,80 @@ async def generate_music_direct(request: MusicGenerateRequest):
             detail=f"Music generation failed: {str(e)}"
         )
 
+@app.post("/api/audio/upload")
+async def upload_combined_audio(
+    combined_file: UploadFile = File(...),
+    user_id: str = None,
+    is_vip: bool = False,
+    title: str = None
+):
+    """Upload pre-combined audio file from frontend"""
+    try:
+        # Read the pre-combined file
+        combined_data = await combined_file.read()
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        # Generate unique file ID
+        file_id = str(uuid.uuid4())
+        
+        if is_vip:
+            # VIP: Upload to Supabase Storage
+            try:
+                # Upload to Supabase storage bucket
+                file_path = f"vip/{user_id}/{file_id}.wav"
+                result = music_service.supabase.storage.from_("music").upload(
+                    file_path, combined_data, {"content-type": "audio/wav"}
+                )
+                
+                # Get public URL
+                cloud_url = music_service.supabase.storage.from_("music").get_public_url(file_path)
+                
+                # Store in user_creations table
+                creation_title = title or f"Creation {int(time.time())}"
+                creation_data = {
+                    "user_id": user_id,
+                    "title": creation_title,
+                    "voice_url": None,
+                    "combined_url": cloud_url,
+                    "music_id": None,
+                    "created_at": time.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                db_result = music_service.supabase.table("user_creations").insert(creation_data).execute()
+                
+                if db_result.data:
+                    return {
+                        "creation_id": db_result.data[0]['id'],
+                        "file_url": cloud_url,
+                        "title": creation_title,
+                        "storage": "cloud"
+                    }
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to store creation")
+                    
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Cloud upload failed: {str(e)}")
+        else:
+            # Free: Local temporary storage
+            local_file_path = uploads_dir / f"{file_id}_temp.wav"
+            with open(local_file_path, "wb") as f:
+                f.write(combined_data)
+            
+            base_url = os.getenv("BASE_URL", "http://0.0.0.0:8001")
+            temp_url = f"{base_url}/files/{file_id}_temp.wav"
+            
+            return {
+                "temp_url": temp_url,
+                "expires_in": 86400,  # 24 hours
+                "storage": "local",
+                "message": "File will be deleted after 24 hours. Upgrade to VIP to save permanently."
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audio upload failed: {str(e)}")
+
 @app.post("/api/audio/combine")
 async def combine_audio(
     voice_file: UploadFile = File(...),
@@ -110,7 +184,7 @@ async def combine_audio(
     is_vip: bool = False,
     title: str = None
 ):
-    """Combine voice recording with AI music"""
+    """Combine voice recording with AI music (VIP backend processing)"""
     try:
         # Process voice file
         voice_data = await voice_file.read()

@@ -271,3 +271,21 @@ Health Check:
 curl https://subliminalgenbackend.onrender.com/
 
 ```
+
+If VIP & duration > 3 minutes → call backend combine API
+
+This becomes an extra VIP feature, not blocking playback.
+
+Flow:
+Frontend → combine locally (1–3 min)
+            ↓
+If VIP & selectedDuration > 3 min:
+    Call backend “long_combine” API
+            ↓
+Backend turns raw files into long version
+            ↓
+Uploads long version to Supabase
+            ↓
+Sends back cloud URL
+            ↓
+Frontend updates track metadata
