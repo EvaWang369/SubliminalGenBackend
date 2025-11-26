@@ -59,6 +59,10 @@ async def root():
         "status": "suno-only",
     }
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "timestamp": time.time()}
+
 
 # ---------------------------------------------------
 # AUTHENTICATION
@@ -140,11 +144,15 @@ async def update_vip_status(request: VIPStatusRequest):
 async def get_user_profile(user_id: str):
     """Get user profile with current VIP status"""
     try:
+        print(f"📋 Getting profile for user: {user_id}")
         user_data = await auth_service.get_user_profile(user_id)
+        print(f"✅ Profile retrieved: VIP={user_data.get('isVIP', False)}")
         return AuthResponse(**user_data)
     except ValueError as e:
+        print(f"❌ Profile not found: {user_id} - {str(e)}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        print(f"💥 Profile error: {user_id} - {str(e)}")
         raise HTTPException(status_code=500, detail=f"Get profile failed: {str(e)}")
 
 
