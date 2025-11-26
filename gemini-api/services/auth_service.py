@@ -116,7 +116,7 @@ class AuthService:
         except Exception as e:
             raise ValueError(f"Google sign in failed: {str(e)}")
 
-    async def update_vip_status(self, user_id: str, is_vip: bool, transaction_id: str, subscription_type: str, subscription_duration_days: int) -> Dict[str, Any]:
+    async def update_vip_status(self, user_id: str, is_vip: bool, transaction_id: str, subscription_type: str, subscription_duration_days: int, vip_level: str = "gold") -> Dict[str, Any]:
         """Update user VIP status after in-app purchase"""
         try:
             from datetime import datetime, timedelta
@@ -127,6 +127,7 @@ class AuthService:
             
             update_data = {
                 "is_vip": is_vip,
+                "vip_level": vip_level if is_vip else "free",
                 "vip_start_date": vip_start.isoformat() if is_vip else None,
                 "vip_end_date": vip_end.isoformat() if is_vip else None,
                 "transaction_id": transaction_id if is_vip else None
@@ -138,12 +139,29 @@ class AuthService:
                 raise ValueError("User not found")
                 
             user = result.data[0]
+            # Calculate current VIP status based on expiration
+            current_is_vip = user["is_vip"]
+            vip_end_date = user.get("vip_end_date")
+            current_vip_level = user.get("vip_level", "free")
+            
+            if current_is_vip and vip_end_date:
+                from datetime import datetime
+                try:
+                    end_date = datetime.fromisoformat(vip_end_date.replace('Z', '+00:00'))
+                    if datetime.now() > end_date:
+                        # VIP expired
+                        current_is_vip = False
+                        current_vip_level = "free"
+                except:
+                    pass
+            
             return {
                 "id": user["user_id"],
                 "email": user["email"],
                 "name": user["name"],
-                "isVIP": user["is_vip"],
-                "vip_end_date": user.get("vip_end_date")
+                "isVIP": current_is_vip,
+                "vip_level": current_vip_level,
+                "vip_end_date": vip_end_date
             }
             
         except Exception as e:
@@ -161,22 +179,30 @@ class AuthService:
                 
             user = result.data[0]
             
-            # Check if VIP has expired
-            is_vip = user.get("is_vip", False)
+            # Calculate current VIP status based on expiration
+            stored_is_vip = user.get("is_vip", False)
             vip_end_date = user.get("vip_end_date")
+            vip_level = user.get("vip_level", "free")
             
-            if is_vip and vip_end_date:
-                end_date = datetime.fromisoformat(vip_end_date.replace('Z', '+00:00'))
-                if datetime.now() > end_date:
-                    # VIP expired, update database
-                    self.supabase.from_("music_users").update({"is_vip": False}).eq("user_id", user_id).execute()
-                    is_vip = False
+            # Compute real-time VIP status
+            current_is_vip = False
+            current_vip_level = "free"
+            
+            if stored_is_vip and vip_end_date:
+                try:
+                    end_date = datetime.fromisoformat(vip_end_date.replace('Z', '+00:00'))
+                    if datetime.now() <= end_date:
+                        current_is_vip = True
+                        current_vip_level = vip_level
+                except:
+                    pass
             
             return {
                 "id": user["user_id"],
                 "email": user["email"],
                 "name": user["name"],
-                "isVIP": is_vip,
+                "isVIP": current_is_vip,
+                "vip_level": current_vip_level,
                 "vip_end_date": vip_end_date
             }
             

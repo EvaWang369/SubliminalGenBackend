@@ -54,3 +54,12 @@ ALTER TABLE music_users
 ADD COLUMN IF NOT EXISTS vip_start_date TIMESTAMP,
 ADD COLUMN IF NOT EXISTS vip_end_date TIMESTAMP,
 ADD COLUMN IF NOT EXISTS transaction_id TEXT;
+
+-- Add VIP level column to music_users table
+ALTER TABLE music_users
+ADD COLUMN IF NOT EXISTS vip_level TEXT DEFAULT 'free';
+
+-- Add constraint for valid values
+ALTER TABLE music_users
+ADD CONSTRAINT vip_level_check
+CHECK (vip_level IN ('free', 'gold', 'platinum'));

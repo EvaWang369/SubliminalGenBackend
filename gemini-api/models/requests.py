@@ -1,5 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from enum import Enum
+
+class VIPLevel(str, Enum):
+    FREE = "free"
+    GOLD = "gold"
+    PLATINUM = "platinum"
 
 class MusicGenerateRequest(BaseModel):
     prompt: str
@@ -45,3 +51,4 @@ class VIPStatusRequest(BaseModel):
     transaction_id: str
     subscription_type: str
     subscription_duration_days: int
+    vip_level: Optional[VIPLevel] = VIPLevel.GOLD

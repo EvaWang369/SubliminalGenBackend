@@ -128,7 +128,8 @@ async def update_vip_status(request: VIPStatusRequest):
             is_vip=request.is_vip,
             transaction_id=request.transaction_id,
             subscription_type=request.subscription_type,
-            subscription_duration_days=request.subscription_duration_days
+            subscription_duration_days=request.subscription_duration_days,
+            vip_level=request.vip_level
         )
         print(f"✅ VIP UPGRADE: {request.user_id} -> VIP: {request.is_vip} | Type: {request.subscription_type} | Days: {request.subscription_duration_days} | Transaction: {request.transaction_id} | End: {user_data.get('vip_end_date', 'N/A')}")
         return AuthResponse(**user_data)

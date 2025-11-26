@@ -30,3 +30,5 @@ class AuthResponse(BaseModel):
     email: str
     name: Optional[str] = None
     isVIP: bool = False
+    vip_level: Optional[str] = "free"
+    vip_end_date: Optional[str] = None
