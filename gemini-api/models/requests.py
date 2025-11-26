@@ -47,7 +47,6 @@ class GoogleAuthRequest(BaseModel):
 
 class VIPStatusRequest(BaseModel):
     user_id: str
-    is_vip: bool
     transaction_id: str
     subscription_type: str
     subscription_duration_days: int

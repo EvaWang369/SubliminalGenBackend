@@ -116,7 +116,7 @@ class AuthService:
         except Exception as e:
             raise ValueError(f"Google sign in failed: {str(e)}")
 
-    async def update_vip_status(self, user_id: str, is_vip: bool, transaction_id: str, subscription_type: str, subscription_duration_days: int, vip_level: str = "gold") -> Dict[str, Any]:
+    async def update_vip_status(self, user_id: str, transaction_id: str, subscription_type: str, subscription_duration_days: int, vip_level: str = "gold") -> Dict[str, Any]:
         """Update user VIP status after in-app purchase"""
         try:
             from datetime import datetime, timedelta
@@ -124,6 +124,9 @@ class AuthService:
             # Calculate VIP end date using iOS-provided duration
             vip_start = datetime.now()
             vip_end = vip_start + timedelta(days=subscription_duration_days)
+            
+            # Infer is_vip from the fact that we're updating VIP status
+            is_vip = subscription_duration_days > 0
             
             update_data = {
                 "is_vip": is_vip,
