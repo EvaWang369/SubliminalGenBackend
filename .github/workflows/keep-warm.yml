@@ -11,4 +11,16 @@ jobs:
     steps:
       - name: Ping Render Backend
         run: |
-          curl -s https://subliminalgenbackend.onrender.com/health || true
+          echo "🏥 Health check at $(date)"
+          response=$(curl -s -w "HTTP_CODE:%{http_code}" https://subliminalgenbackend.onrender.com/health || echo "CURL_FAILED")
+          
+          if [[ $response == *"CURL_FAILED"* ]]; then
+            echo "❌ Health check failed - curl error"
+            exit 0
+          elif [[ $response == *"HTTP_CODE:200"* ]]; then
+            echo "✅ Health check successful"
+            echo "Response: ${response%HTTP_CODE:*}"
+          else
+            echo "⚠️ Health check returned non-200 status"
+            echo "Full response: $response"
+          fi
