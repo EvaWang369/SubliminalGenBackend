@@ -357,6 +357,7 @@ async def combine_audio(
     user_id: str = None,
     is_vip: str = "false",
     title: str = None,
+    duration: int = Form(None),
 ):
     """
     Combine voice recording with AI music (VIP backend processing).
@@ -382,57 +383,84 @@ async def combine_audio(
             raise HTTPException(status_code=400, detail="Empty voice_file")
 
         combined_file_id = str(uuid.uuid4())
-        combined_file_name = f"{combined_file_id}_combined.wav"
-        combined_file_path = uploads_dir / combined_file_name
 
         # TODO: real audio mixing in production
-        with open(combined_file_path, "wb") as f:
-            f.write(voice_data)
+        combined_data = voice_data  # Currently just using voice as placeholder
 
-        file_url = f"{BASE_URL}/files/{combined_file_name}"
-        print(f"🎛 Combined file stored at {combined_file_path}")
-        print(f"   URL: {file_url}")
-
-        # VIP: store in DB
+        # ---------------- VIP FLOW: store in Supabase + DB ----------------
         if is_vip_bool and user_id:
-            creation_title = title or f"Creation {int(time.time())}"
-            creation_data = {
-                "user_id": user_id,
-                "title": creation_title,
-                "voice_url": None,
-                "combined_url": file_url,
-                "music_id": music_id,
-                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
+            try:
+                file_path = f"vip/{user_id}/{combined_file_id}.wav"
+                print(f"☁️ Uploading to Supabase path: {file_path}")
 
-            print("🗄 Inserting VIP creation:", creation_data)
-
-            result = (
-                music_service.supabase
-                .from_("user_creations")
-                .insert(creation_data)
-                .execute()
-            )
-            print("   Supabase insert result:", result)
-
-            if getattr(result, "data", None):
-                creation_id = result.data[0]["id"]
-                return {
-                    "creation_id": creation_id,
-                    "file_url": file_url,
-                    "title": creation_title,
-                }
-            else:
-                print("❌ No data returned from Supabase on VIP insert")
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to store creation in database",
+                # Upload to Supabase Storage bucket "music"
+                upload_result = music_service.supabase.storage.from_("music").upload(
+                    file_path,
+                    combined_data,
+                    {"content-type": "audio/wav"},
                 )
+                print(f"   Supabase upload result: {upload_result}")
 
-        # Free users: just return temporary URL
+                # Get public URL
+                cloud_url = music_service.supabase.storage.from_("music").get_public_url(
+                    file_path
+                )
+                print(f"   Public URL: {cloud_url}")
+
+                creation_title = title or f"Creation {int(time.time())}"
+                creation_data = {
+                    "user_id": user_id,
+                    "title": creation_title,
+                    "voice_url": None,
+                    "combined_url": cloud_url,
+                    "music_id": music_id,
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+
+                print("🗄 Inserting into user_creations:", creation_data)
+
+                db_result = (
+                    music_service.supabase
+                    .from_("user_creations")
+                    .insert(creation_data)
+                    .execute()
+                )
+                print("   Supabase insert result:", db_result)
+
+                if getattr(db_result, "data", None):
+                    creation_row = db_result.data[0]
+                    return {
+                        "creation_id": creation_row["id"],
+                        "file_url": cloud_url,
+                        "title": creation_title,
+                        "storage": "cloud",
+                    }
+                else:
+                    print("❌ No data returned from Supabase user_creations insert")
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Failed to store creation in database",
+                    )
+
+            except Exception as e:
+                print(f"❌ Cloud upload failed: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Cloud upload failed: {str(e)}")
+
+        # ---------------- FREE FLOW: local temp file ----------------
+        combined_file_name = f"{combined_file_id}_temp.wav"
+        combined_file_path = uploads_dir / combined_file_name
+
+        with open(combined_file_path, "wb") as f:
+            f.write(combined_data)
+
+        temp_url = f"{BASE_URL}/files/{combined_file_name}"
+        print(f"💾 Stored temporary file at: {combined_file_path}")
+        print(f"   Accessible at: {temp_url}")
+
         return {
-            "temp_url": file_url,
+            "temp_url": temp_url,
             "expires_in": 86400,
+            "storage": "local",
             "message": "File will be deleted after 24 hours. Upgrade to VIP to save permanently.",
         }
 
@@ -479,6 +507,7 @@ async def get_user_library(user_id: str):
     except Exception as e:
         print(f"❌ Failed to get library: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get library: {str(e)}")
+
 
 
 # ---------------------------------------------------
