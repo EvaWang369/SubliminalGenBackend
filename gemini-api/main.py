@@ -448,11 +448,48 @@ async def combine_audio(
             
             print(f"✅ Mixed audio: {len(combined_data)} bytes, duration: {len(mixed_audio)}ms")
             
-        except ImportError:
-            print("⚠️ pydub not installed, using voice as placeholder")
-            combined_data = voice_data
+        except ImportError as e:
+            print(f"❌ pydub not installed: {str(e)}")
+            print("⚠️ Falling back to simple duration extension")
+            
+            # Simple fallback: repeat voice file to match duration
+            import wave
+            import struct
+            
+            try:
+                # Read voice WAV file
+                voice_wav = io.BytesIO(voice_data)
+                with wave.open(voice_wav, 'rb') as wav_file:
+                    frames = wav_file.readframes(wav_file.getnframes())
+                    params = wav_file.getparams()
+                
+                # Calculate how many times to repeat
+                voice_duration_sec = len(frames) / (params.sampwidth * params.nchannels * params.framerate)
+                target_duration_sec = duration if duration else 1800  # Default 30 min
+                repeat_count = max(1, int(target_duration_sec / voice_duration_sec))
+                
+                print(f"🔁 Repeating {voice_duration_sec:.1f}s voice {repeat_count} times for {target_duration_sec}s")
+                
+                # Create extended audio by repeating
+                extended_frames = frames * repeat_count
+                
+                # Write to new WAV file
+                output_wav = io.BytesIO()
+                with wave.open(output_wav, 'wb') as out_wav:
+                    out_wav.setparams(params)
+                    out_wav.writeframes(extended_frames)
+                
+                combined_data = output_wav.getvalue()
+                print(f"✅ Extended audio: {len(combined_data)} bytes")
+                
+            except Exception as wav_error:
+                print(f"❌ WAV processing failed: {str(wav_error)}")
+                combined_data = voice_data
+                
         except Exception as e:
-            print(f"⚠️ Audio mixing failed: {str(e)}, using voice as placeholder")
+            print(f"❌ Audio mixing failed: {str(e)}")
+            print(f"❌ Error type: {type(e).__name__}")
+            print("⚠️ Using voice as placeholder")
             combined_data = voice_data
 
         # ---------------- VIP FLOW: store in Supabase + DB ----------------
