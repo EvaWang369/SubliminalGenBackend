@@ -413,84 +413,66 @@ async def combine_audio(
             raise HTTPException(status_code=500, detail=f"Failed to download music: {str(e)}")
         
         # Mix voice + music for requested duration
-        print(f"🎛️ Mixing voice + music for {duration}s ({duration//60}min {duration%60}s)")
+        target_duration = duration if duration else 1800  # Default 30 min
+        print(f"🎛️ Mixing voice + music for {target_duration}s ({target_duration//60}min {target_duration%60}s)")
+        print(f"📊 Voice data: {len(voice_data)} bytes")
+        print(f"📊 Music data: {len(music_data)} bytes")
         
         try:
+            print("🔄 Step 1: Importing pydub...")
             from pydub import AudioSegment
             import io
+            print("✅ pydub imported successfully")
             
             # Load audio files
+            print("🔄 Step 2: Loading voice audio...")
             voice_audio = AudioSegment.from_file(io.BytesIO(voice_data))
-            music_audio = AudioSegment.from_file(io.BytesIO(music_data))
+            print(f"✅ Voice loaded: {len(voice_audio)}ms ({len(voice_audio)/1000:.1f}s)")
             
-            print(f"📊 Voice: {len(voice_audio)}ms, Music: {len(music_audio)}ms")
+            print("🔄 Step 3: Loading music audio...")
+            music_audio = AudioSegment.from_file(io.BytesIO(music_data))
+            print(f"✅ Music loaded: {len(music_audio)}ms ({len(music_audio)/1000:.1f}s)")
             
             # Target duration in milliseconds
-            target_duration_ms = duration * 1000 if duration else 30 * 60 * 1000  # Default 30 min
+            target_duration_ms = target_duration * 1000
+            print(f"🎯 Target duration: {target_duration_ms}ms ({target_duration_ms/1000/60:.1f}min)")
             
             # Loop music to match target duration
+            print("🔄 Step 4: Extending music...")
             loops_needed = (target_duration_ms // len(music_audio)) + 1
+            print(f"🔁 Music loops needed: {loops_needed}")
             extended_music = music_audio * loops_needed
             extended_music = extended_music[:target_duration_ms]  # Trim to exact duration
+            print(f"✅ Extended music: {len(extended_music)}ms")
             
             # Loop voice to match target duration  
+            print("🔄 Step 5: Extending voice...")
             voice_loops_needed = (target_duration_ms // len(voice_audio)) + 1
+            print(f"🔁 Voice loops needed: {voice_loops_needed}")
             extended_voice = voice_audio * voice_loops_needed
             extended_voice = extended_voice[:target_duration_ms]  # Trim to exact duration
+            print(f"✅ Extended voice: {len(extended_voice)}ms")
             
             # Mix voice over music (voice at 80% volume, music at 40% volume)
-            mixed_audio = extended_music.apply_gain(-8) + extended_voice.apply_gain(-2)
+            print("🔄 Step 6: Mixing audio...")
+            music_with_gain = extended_music.apply_gain(-8)  # Reduce music volume
+            voice_with_gain = extended_voice.apply_gain(-2)  # Slight voice reduction
+            mixed_audio = music_with_gain + voice_with_gain
+            print(f"✅ Mixed audio: {len(mixed_audio)}ms")
             
             # Export to bytes
+            print("🔄 Step 7: Exporting mixed audio...")
             output_buffer = io.BytesIO()
             mixed_audio.export(output_buffer, format="wav")
             combined_data = output_buffer.getvalue()
             
-            print(f"✅ Mixed audio: {len(combined_data)} bytes, duration: {len(mixed_audio)}ms")
+            print(f"✅ MIXING SUCCESS: {len(combined_data)} bytes, duration: {len(mixed_audio)}ms ({len(mixed_audio)/1000/60:.1f}min)")
+            print(f"🎉 Audio mixing completed successfully!")
             
         except ImportError as e:
-            print(f"❌ pydub not installed: {str(e)}")
-            print("⚠️ Falling back to simple duration extension")
-            
-            # Simple fallback: repeat voice file to match duration
-            import wave
-            import struct
-            
-            try:
-                # Read voice WAV file
-                voice_wav = io.BytesIO(voice_data)
-                with wave.open(voice_wav, 'rb') as wav_file:
-                    frames = wav_file.readframes(wav_file.getnframes())
-                    params = wav_file.getparams()
-                
-                # Calculate how many times to repeat
-                voice_duration_sec = len(frames) / (params.sampwidth * params.nchannels * params.framerate)
-                target_duration_sec = duration if duration else 1800  # Default 30 min
-                repeat_count = max(1, int(target_duration_sec / voice_duration_sec))
-                
-                print(f"🔁 Repeating {voice_duration_sec:.1f}s voice {repeat_count} times for {target_duration_sec}s")
-                
-                # Create extended audio by repeating
-                extended_frames = frames * repeat_count
-                
-                # Write to new WAV file
-                output_wav = io.BytesIO()
-                with wave.open(output_wav, 'wb') as out_wav:
-                    out_wav.setparams(params)
-                    out_wav.writeframes(extended_frames)
-                
-                combined_data = output_wav.getvalue()
-                print(f"✅ Extended audio: {len(combined_data)} bytes")
-                
-            except Exception as wav_error:
-                print(f"❌ WAV processing failed: {str(wav_error)}")
-                combined_data = voice_data
-                
-        except Exception as e:
-            print(f"❌ Audio mixing failed: {str(e)}")
-            print(f"❌ Error type: {type(e).__name__}")
-            print("⚠️ Using voice as placeholder")
-            combined_data = voice_data
+            print(f"❌ IMPORT ERROR: pydub not installed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Audio processing unavailable: {str(e)}")
+
 
         # ---------------- VIP FLOW: store in Supabase + DB ----------------
         if is_vip_bool and user_id:
