@@ -63,3 +63,22 @@ ADD COLUMN IF NOT EXISTS vip_level TEXT DEFAULT 'free';
 ALTER TABLE music_users
 ADD CONSTRAINT vip_level_check
 CHECK (vip_level IN ('free', 'gold', 'platinum'));
+
+-- Platinum Downloads Table for Extended Mixes
+CREATE TABLE IF NOT EXISTS platinum_downloads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token TEXT UNIQUE NOT NULL,
+    user_id TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    title TEXT NOT NULL,
+    duration INTEGER NOT NULL,
+    file_size BIGINT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL,
+    downloaded BOOLEAN DEFAULT FALSE
+);
+
+-- Indexes for platinum downloads
+CREATE INDEX IF NOT EXISTS idx_platinum_downloads_expires_at ON platinum_downloads (expires_at);
+CREATE INDEX IF NOT EXISTS idx_platinum_downloads_token ON platinum_downloads (token);
+CREATE INDEX IF NOT EXISTS idx_platinum_downloads_user_id ON platinum_downloads (user_id);

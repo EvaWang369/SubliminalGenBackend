@@ -19,3 +19,6 @@ supabase>=2.0.2
 
 # Basic utilities
 numpy>=1.24.3
+
+# Audio processing
+pydub>=0.25.1

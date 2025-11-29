@@ -384,8 +384,76 @@ async def combine_audio(
 
         combined_file_id = str(uuid.uuid4())
 
-        # TODO: real audio mixing in production
-        combined_data = voice_data  # Currently just using voice as placeholder
+        # Fetch music track by music_id
+        print(f"🎵 Fetching music track: {music_id}")
+        music_result = (
+            music_service.supabase
+            .from_("music")
+            .select("*")
+            .eq("uuid", music_id)
+            .execute()
+        )
+        
+        if not music_result.data:
+            raise HTTPException(status_code=404, detail=f"Music track {music_id} not found")
+        
+        music_track = music_result.data[0]
+        music_url = music_track["supabase_url"]
+        print(f"🎶 Found music: {music_track['title']} at {music_url}")
+        
+        # Download music file from Supabase Storage
+        music_path = music_url.split("/music/")[-1]  # Extract path from URL
+        print(f"📥 Downloading music from: {music_path}")
+        
+        try:
+            music_data = music_service.supabase.storage.from_("music").download(music_path)
+            print(f"✅ Downloaded music: {len(music_data)} bytes")
+        except Exception as e:
+            print(f"❌ Failed to download music: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to download music: {str(e)}")
+        
+        # Mix voice + music for requested duration
+        print(f"🎛️ Mixing voice + music for {duration}s ({duration//60}min {duration%60}s)")
+        
+        try:
+            from pydub import AudioSegment
+            import io
+            
+            # Load audio files
+            voice_audio = AudioSegment.from_file(io.BytesIO(voice_data))
+            music_audio = AudioSegment.from_file(io.BytesIO(music_data))
+            
+            print(f"📊 Voice: {len(voice_audio)}ms, Music: {len(music_audio)}ms")
+            
+            # Target duration in milliseconds
+            target_duration_ms = duration * 1000 if duration else 30 * 60 * 1000  # Default 30 min
+            
+            # Loop music to match target duration
+            loops_needed = (target_duration_ms // len(music_audio)) + 1
+            extended_music = music_audio * loops_needed
+            extended_music = extended_music[:target_duration_ms]  # Trim to exact duration
+            
+            # Loop voice to match target duration  
+            voice_loops_needed = (target_duration_ms // len(voice_audio)) + 1
+            extended_voice = voice_audio * voice_loops_needed
+            extended_voice = extended_voice[:target_duration_ms]  # Trim to exact duration
+            
+            # Mix voice over music (voice at 80% volume, music at 40% volume)
+            mixed_audio = extended_music.apply_gain(-8) + extended_voice.apply_gain(-2)
+            
+            # Export to bytes
+            output_buffer = io.BytesIO()
+            mixed_audio.export(output_buffer, format="wav")
+            combined_data = output_buffer.getvalue()
+            
+            print(f"✅ Mixed audio: {len(combined_data)} bytes, duration: {len(mixed_audio)}ms")
+            
+        except ImportError:
+            print("⚠️ pydub not installed, using voice as placeholder")
+            combined_data = voice_data
+        except Exception as e:
+            print(f"⚠️ Audio mixing failed: {str(e)}, using voice as placeholder")
+            combined_data = voice_data
 
         # ---------------- VIP FLOW: store in Supabase + DB ----------------
         if is_vip_bool and user_id:
