@@ -348,9 +348,9 @@ async def upload_combined_audio(
 
 
 # ---------------------------------------------------
-# BACKEND COMBINE (VIP FEATURE)
+# BACKEND COMBINE (PLATINUM FEATURE)
 # ---------------------------------------------------
-@app.post("/api/audio/combine")
+@app.post("/api/platinum/backend-combine")
 async def combine_audio(
     voice_file: UploadFile = File(...),
     music_id: str = None,
