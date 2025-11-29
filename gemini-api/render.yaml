@@ -1,8 +1,9 @@
 services:
   - type: web
     name: subliminalgen-api
-    env: docker
-    dockerfilePath: ./Dockerfile
+    env: python
+    buildCommand: apt-get update && apt-get install -y ffmpeg && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENVIRONMENT
         value: production
