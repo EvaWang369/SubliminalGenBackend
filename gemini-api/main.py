@@ -353,10 +353,10 @@ async def upload_combined_audio(
 @app.post("/api/platinum/backend-combine")
 async def combine_audio(
     voice_file: UploadFile = File(...),
-    music_id: str = None,
-    user_id: str = None,
-    is_vip: str = "false",
-    title: str = None,
+    music_id: str = Form(...),
+    user_id: str = Form(...),
+    is_vip: str = Form("false"),
+    title: str = Form(None),
     duration: int = Form(None),
 ):
     """
