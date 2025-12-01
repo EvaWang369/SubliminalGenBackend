@@ -1,0 +1,37 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: subliminalgen-backend
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # High-performance configuration for FFmpeg
+        run.googleapis.com/cpu: "2"
+        run.googleapis.com/memory: "4Gi"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/timeout: "3600"  # 60 minutes timeout
+    spec:
+      containerConcurrency: 10
+      containers:
+      - image: gcr.io/YOUR_PROJECT_ID/subliminalgen-backend
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: BASE_URL
+          value: "https://subliminalgen-backend-YOUR_HASH-uc.a.run.app"
+        # Add your environment variables here
+        - name: SUPABASE_URL
+          value: "YOUR_SUPABASE_URL"
+        - name: SUPABASE_KEY
+          value: "YOUR_SUPABASE_KEY"
+        - name: SUNO_API_KEY
+          value: "YOUR_SUNO_API_KEY"
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"

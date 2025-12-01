@@ -351,8 +351,9 @@ async def upload_combined_audio(
 
 # ---------------------------------------------------
 # BACKEND COMBINE (PLATINUM FEATURE) - FFMPEG VERSION
+# DEPRECATED: Complex mixing approach - kept for reference
 # ---------------------------------------------------
-@app.post("/api/platinum/backend-combine")
+# @app.post("/api/platinum/backend-combine")
 async def combine_audio(
     voice_file: UploadFile = File(...),
     music_id: str = Form(...),
@@ -460,18 +461,33 @@ async def combine_audio(
         print(f"   Music temp: {music_tmp_path}")
 
         # ------------------------------------------------------------------
-        # 5) Decide final target duration (seconds)
+        # 5) Decide final target duration (seconds) - OPTIMIZED FOR LOW RESOURCES
         # ------------------------------------------------------------------
         print("\n🎛️ STEP 5: Setting target duration...")
-        final_duration = duration if duration else 1800  # default 30min
-        # You can optionally clamp max duration to avoid 10-hour accidental mixes:
-        max_allowed = 4 * 3600  # 4 hours
+        final_duration = duration if duration else 300  # default 5min for Render compatibility
+        
+        # Smart limits based on environment capabilities
+        import os
+        is_render = os.getenv('RENDER') is not None
+        is_cloud_run = os.getenv('K_SERVICE') is not None  # Cloud Run detection
+        
+        if is_render:
+            max_allowed = 600  # 10 minutes max on Render (limited resources)
+            print("🔧 Render environment detected - applying resource limits")
+        elif is_cloud_run:
+            max_allowed = 3600  # 60 minutes max on Cloud Run (powerful resources)
+            print("☁️ Google Cloud Run detected - high performance mode")
+        else:
+            max_allowed = 4 * 3600  # 4 hours for local/powerful servers
+            
         if final_duration > max_allowed:
-            print(f"⚠️ Duration clamped: {final_duration}s -> {max_allowed}s (max allowed)")
+            print(f"⚠️ Duration clamped: {final_duration}s -> {max_allowed}s (resource limit)")
             final_duration = max_allowed
 
         print(f"✅ STEP 5 SUCCESS: Target duration set")
         print(f"   Duration: {final_duration}s ({final_duration//60}min {final_duration%60}s)")
+        env_name = 'Render (limited)' if is_render else 'Cloud Run (powerful)' if is_cloud_run else 'Local/Server'
+        print(f"   Environment: {env_name}")
 
         # ------------------------------------------------------------------
         # 6) Use ffmpeg to loop + mix both streams into final WAV
@@ -480,12 +496,19 @@ async def combine_audio(
         # Output file (in temp first)
         output_tmp_path = Path(tempfile.gettempdir()) / f"platinum_mix_{combined_file_id}.wav"
         print(f"   Output path: {output_tmp_path}")
+        
+        # Memory management based on environment
+        if is_render and final_duration > 300:
+            print("   Using memory-efficient mode for Render")
+        elif is_cloud_run:
+            print("   Using high-performance mode for Cloud Run")
+        else:
+            print("   Using standard processing mode")
 
-        # We let ffmpeg handle:
-        # -stream_loop -1 to loop indefinitely
-        # -t <seconds> to cut at final duration
-        # volume filters: music quieter, voice louder
-        ffmpeg_cmd = [
+        # Resource-optimized FFmpeg with high quality audio:
+        # - Keep high quality for subliminal content
+        # - Optimize memory usage and processing
+        base_cmd = [
             "ffmpeg",
             "-y",                         # overwrite
             "-stream_loop", "-1", "-i", str(music_tmp_path),  # loop music
@@ -495,22 +518,52 @@ async def combine_audio(
             "[1:a]volume=0.8[a1];"
             "[a0][a1]amix=inputs=2:normalize=0[aout]",
             "-map", "[aout]",
-            "-ac", "2",                   # stereo
-            "-ar", "44100",               # 44.1kHz sample rate
+            "-ac", "2",                   # stereo (keep quality)
+            "-ar", "44100",               # 44.1kHz (keep quality)
+            "-threads", "1",              # single thread (predictable memory)
             "-t", str(final_duration),    # stop at target duration
-            str(output_tmp_path),
         ]
+        
+        # Environment-specific optimizations
+        if is_render:
+            # Render: Memory-constrained optimizations
+            ffmpeg_cmd = base_cmd + [
+                "-preset", "ultrafast",       # fastest encoding
+                "-bufsize", "64k",            # smaller buffer
+                "-maxrate", "320k",           # limit bitrate spikes
+                str(output_tmp_path),
+            ]
+        elif is_cloud_run:
+            # Cloud Run: High-performance optimizations
+            ffmpeg_cmd = base_cmd + [
+                "-threads", "2",              # use both vCPUs
+                "-preset", "fast",            # balanced speed/quality
+                str(output_tmp_path),
+            ]
+        else:
+            # Local: No restrictions
+            ffmpeg_cmd = base_cmd + [str(output_tmp_path)]
 
         print("   FFmpeg command:")
         print(f"   {' '.join(ffmpeg_cmd)}")
         print("   Processing... (this may take a moment)")
 
         try:
+            # Environment-specific timeouts
+            if is_render:
+                timeout_seconds = min(final_duration * 2 + 120, 900)  # Max 15min timeout on Render
+            elif is_cloud_run:
+                timeout_seconds = min(final_duration * 1.5 + 60, 3600)  # Max 60min timeout on Cloud Run
+            else:
+                timeout_seconds = final_duration * 3 + 60  # 3x duration + 1min buffer locally
+            print(f"   FFmpeg timeout: {timeout_seconds}s")
+            
             result = subprocess.run(
                 ffmpeg_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True,
+                timeout=timeout_seconds,  # Prevent hanging processes
             )
             print("✅ STEP 6 SUCCESS: FFmpeg processing completed")
             if result.stderr:
@@ -522,6 +575,18 @@ async def combine_audio(
                 for line in stderr_lines[-5:]:
                     if line.strip():
                         print(f"   {line}")
+        except subprocess.TimeoutExpired as e:
+            print("❌ STEP 6 FAILED: FFmpeg timeout (resource limit exceeded)")
+            print(f"   Timeout after {timeout_seconds}s")
+            if is_render:
+                print("   Render free tier limit reached - try duration ≤5min or upgrade plan")
+                raise HTTPException(status_code=500, detail="Processing timeout on free tier - try shorter duration (≤5min) or upgrade to paid plan")
+            elif is_cloud_run:
+                print("   Cloud Run timeout - try shorter duration or check request limits")
+                raise HTTPException(status_code=500, detail=f"Processing timeout on Cloud Run after {timeout_seconds}s")
+            else:
+                print("   Try shorter duration or check system resources")
+                raise HTTPException(status_code=500, detail=f"Audio processing timeout after {timeout_seconds}s")
         except subprocess.CalledProcessError as e:
             print("❌ STEP 6 FAILED: FFmpeg processing error")
             stderr_output = e.stderr.decode("utf-8", errors="ignore")
@@ -689,6 +754,310 @@ async def combine_audio(
         print(f"❌ Error: {str(e)}")
         print("="*60)
         raise HTTPException(status_code=500, detail=f"Audio combination failed: {str(e)}")
+
+
+# ---------------------------------------------------
+# EXTEND AUDIO (NEW PLATINUM FEATURE) - SIMPLE LOOP APPROACH
+# ---------------------------------------------------
+@app.post("/api/platinum/extend-audio")
+async def extend_audio(
+    combined_file: UploadFile = File(...),
+    loops: int = Form(...),
+    target_duration_label: str = Form(...),
+    user_id: str = Form(...),
+    is_vip: str = Form("false"),
+    title: str = Form(None),
+):
+    """
+    Extend pre-mixed audio by looping with fade in/out.
+    
+    New approach:
+    1. iOS pre-mixes voice + music (30s-5min)
+    2. Backend applies fade in/out to input
+    3. Backend loops the faded version
+    4. Return extended audio (~10min, ~15min, ~30min)
+    
+    Much faster than complex mixing!
+    """
+    try:
+        is_vip_bool = is_vip.lower() in ("true", "1", "yes")
+        
+        print("\n" + "="*60)
+        print("🚀 PLATINUM EXTEND-AUDIO STARTED")
+        print("="*60)
+        print(f"📥 Request Details:")
+        print(f"   user_id = {user_id}")
+        print(f"   is_vip = {is_vip} -> {is_vip_bool}")
+        print(f"   title = {title}")
+        print(f"   filename = {combined_file.filename}")
+        print(f"   loops = {loops}")
+        print(f"   target_label = {target_duration_label}")
+        
+        if loops < 1:
+            print("❌ VALIDATION FAILED: loops must be >= 1")
+            raise HTTPException(status_code=400, detail="loops must be >= 1")
+            
+        # ------------------------------------------------------------------
+        # 1) Read pre-mixed file from iOS
+        # ------------------------------------------------------------------
+        print("\n🎧 STEP 1: Reading pre-mixed audio file...")
+        combined_data = await combined_file.read()
+        if not combined_data:
+            print("❌ STEP 1 FAILED: Empty combined_file")
+            raise HTTPException(status_code=400, detail="Empty combined_file")
+            
+        print(f"✅ STEP 1 SUCCESS: Pre-mixed file read ({len(combined_data)} bytes)")
+        extended_file_id = str(uuid.uuid4())
+        print(f"🆔 Generated extended_file_id: {extended_file_id}")
+        
+        # ------------------------------------------------------------------
+        # 2) Save input to temporary file
+        # ------------------------------------------------------------------
+        print("\n📝 STEP 2: Creating temporary input file...")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as input_tmp:
+            input_tmp_path = Path(input_tmp.name)
+            input_tmp.write(combined_data)
+            
+        print(f"✅ STEP 2 SUCCESS: Input temp file created")
+        print(f"   Path: {input_tmp_path}")
+        
+        # ------------------------------------------------------------------
+        # 3) Get input duration for fade calculation
+        # ------------------------------------------------------------------
+        print("\n🔍 STEP 3: Analyzing input duration...")
+        try:
+            probe_cmd = ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", str(input_tmp_path)]
+            result = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
+            input_duration = float(result.stdout.strip())
+            print(f"✅ STEP 3 SUCCESS: Input duration = {input_duration:.1f}s ({input_duration//60:.0f}min {input_duration%60:.0f}s)")
+        except Exception as e:
+            print(f"❌ STEP 3 FAILED: Could not analyze input duration: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Could not analyze input duration: {str(e)}")
+            
+        # ------------------------------------------------------------------
+        # 4) Apply fade in/out to input file
+        # ------------------------------------------------------------------
+        print("\n🌊 STEP 4: Applying fade in/out...")
+        faded_tmp_path = Path(tempfile.gettempdir()) / f"faded_{extended_file_id}.wav"
+        
+        fade_duration = 4  # 4 second fades
+        fade_out_start = max(0, input_duration - fade_duration)
+        
+        fade_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(input_tmp_path),
+            "-filter_complex",
+            f"[0:a]afade=t=in:ss=0:d={fade_duration},afade=t=out:st={fade_out_start}:d={fade_duration}[faded]",
+            "-map", "[faded]",
+            "-ac", "2",  # stereo
+            "-ar", "44100",  # 44.1kHz
+            str(faded_tmp_path)
+        ]
+        
+        print(f"   Fade in: 0-{fade_duration}s")
+        print(f"   Fade out: {fade_out_start}-{input_duration}s")
+        print("   Running fade command...")
+        
+        try:
+            result = subprocess.run(fade_cmd, capture_output=True, check=True, timeout=60)
+            print("✅ STEP 4 SUCCESS: Fade in/out applied")
+        except subprocess.CalledProcessError as e:
+            print("❌ STEP 4 FAILED: Fade processing error")
+            print(f"   Error: {e.stderr.decode('utf-8', errors='ignore')[-200:]}")
+            raise HTTPException(status_code=500, detail="Fade processing failed")
+        except subprocess.TimeoutExpired:
+            print("❌ STEP 4 FAILED: Fade processing timeout")
+            raise HTTPException(status_code=500, detail="Fade processing timeout")
+            
+        # ------------------------------------------------------------------
+        # 5) Loop the faded version
+        # ------------------------------------------------------------------
+        print(f"\n🔁 STEP 5: Looping faded audio {loops} times...")
+        output_tmp_path = Path(tempfile.gettempdir()) / f"extended_{extended_file_id}.wav"
+        
+        loop_cmd = [
+            "ffmpeg", "-y",
+            "-stream_loop", str(loops - 1),  # -1 because original counts as first loop
+            "-i", str(faded_tmp_path),
+            "-c", "copy",  # copy without re-encoding for speed
+            str(output_tmp_path)
+        ]
+        
+        print(f"   Total loops: {loops}")
+        print(f"   Expected duration: ~{input_duration * loops:.0f}s ({(input_duration * loops)//60:.0f}min {(input_duration * loops)%60:.0f}s)")
+        print("   Running loop command...")
+        
+        try:
+            result = subprocess.run(loop_cmd, capture_output=True, check=True, timeout=120)
+            print("✅ STEP 5 SUCCESS: Audio looping completed")
+        except subprocess.CalledProcessError as e:
+            print("❌ STEP 5 FAILED: Loop processing error")
+            print(f"   Error: {e.stderr.decode('utf-8', errors='ignore')[-200:]}")
+            raise HTTPException(status_code=500, detail="Loop processing failed")
+        except subprocess.TimeoutExpired:
+            print("❌ STEP 5 FAILED: Loop processing timeout")
+            raise HTTPException(status_code=500, detail="Loop processing timeout")
+            
+        # ------------------------------------------------------------------
+        # 6) Read final output
+        # ------------------------------------------------------------------
+        print("\n📊 STEP 6: Reading final output...")
+        if not output_tmp_path.exists():
+            print("❌ STEP 6 FAILED: Output file not created")
+            raise HTTPException(status_code=500, detail="Output file not created")
+            
+        extended_data = output_tmp_path.read_bytes()
+        actual_duration = input_duration * loops
+        file_size_mb = len(extended_data) / (1024 * 1024)
+        
+        print(f"✅ STEP 6 SUCCESS: Final output ready")
+        print(f"   File size: {len(extended_data)} bytes ({file_size_mb:.1f} MB)")
+        print(f"   Actual duration: {actual_duration:.0f}s ({actual_duration//60:.0f}min {actual_duration%60:.0f}s)")
+        
+        # ------------------------------------------------------------------
+        # 7) Cleanup temp files
+        # ------------------------------------------------------------------
+        print("\n🧹 STEP 7: Cleaning up temporary files...")
+        try:
+            if input_tmp_path.exists():
+                input_tmp_path.unlink()
+                print("   ✅ Input temp file deleted")
+            if faded_tmp_path.exists():
+                faded_tmp_path.unlink()
+                print("   ✅ Faded temp file deleted")
+        except Exception as cleanup_err:
+            print(f"   ⚠️ Temp cleanup warning (non-fatal): {cleanup_err}")
+            
+        # ------------------------------------------------------------------
+        # 8) VIP FLOW: Upload to Supabase + DB
+        # ------------------------------------------------------------------
+        if is_vip_bool and user_id:
+            print("\n☁️ STEP 8: VIP FLOW - Uploading to cloud storage...")
+            try:
+                file_path = f"vip/{user_id}/{extended_file_id}.wav"
+                print(f"   Cloud path: {file_path}")
+                print(f"   Uploading {file_size_mb:.1f} MB to Supabase...")
+                
+                upload_result = music_service.supabase.storage.from_("music").upload(
+                    file_path,
+                    extended_data,
+                    {"content-type": "audio/wav"},
+                )
+                print(f"   ✅ Upload successful")
+                
+                cloud_url = music_service.supabase.storage.from_("music").get_public_url(file_path)
+                print(f"   🔗 Public URL: {cloud_url}")
+                
+                creation_title = title or f"Extended {target_duration_label} Session"
+                creation_data = {
+                    "user_id": user_id,
+                    "title": creation_title,
+                    "voice_url": None,
+                    "combined_url": cloud_url,
+                    "music_id": None,
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                
+                print("\n🗄️ STEP 9: Saving to database...")
+                db_result = (
+                    music_service.supabase
+                    .from_("user_creations")
+                    .insert(creation_data)
+                    .execute()
+                )
+                print(f"   ✅ Database insert successful")
+                
+                # Cleanup output temp file after upload
+                try:
+                    if output_tmp_path.exists():
+                        output_tmp_path.unlink()
+                        print("   ✅ Output temp file deleted")
+                except Exception as cleanup_err:
+                    print(f"   ⚠️ Output cleanup warning: {cleanup_err}")
+                    
+                if getattr(db_result, "data", None):
+                    creation_row = db_result.data[0]
+                    print("\n" + "="*60)
+                    print("🎉 PLATINUM EXTEND-AUDIO COMPLETED SUCCESSFULLY (VIP)")
+                    print("="*60)
+                    print(f"✅ Creation ID: {creation_row['id']}")
+                    print(f"✅ File URL: {cloud_url}")
+                    print(f"✅ Title: {creation_title}")
+                    print(f"✅ Actual Duration: {actual_duration:.0f}s")
+                    print(f"✅ Target Label: {target_duration_label}")
+                    print(f"✅ Loops Applied: {loops}")
+                    print(f"✅ Storage: Cloud (VIP)")
+                    print("="*60)
+                    return {
+                        "creation_id": creation_row["id"],
+                        "file_url": cloud_url,
+                        "title": creation_title,
+                        "actual_duration": int(actual_duration),
+                        "target_label": target_duration_label,
+                        "loops_applied": loops,
+                        "storage": "cloud",
+                    }
+                else:
+                    print("❌ STEP 9 FAILED: No data returned from database")
+                    raise HTTPException(status_code=500, detail="Failed to store creation in database")
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"❌ STEP 8-9 FAILED: Cloud upload/database error: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Cloud upload failed: {str(e)}")
+                
+        # ------------------------------------------------------------------
+        # 8) FREE FLOW: Save locally
+        # ------------------------------------------------------------------
+        print("\n💾 STEP 8: FREE FLOW - Saving to local storage...")
+        extended_file_name = f"{extended_file_id}_temp.wav"
+        extended_file_path = uploads_dir / extended_file_name
+        
+        with open(extended_file_path, "wb") as f:
+            f.write(extended_data)
+        print(f"   ✅ File saved locally ({file_size_mb:.1f} MB)")
+        
+        # Cleanup output temp file after copying
+        try:
+            if output_tmp_path.exists():
+                output_tmp_path.unlink()
+                print("   ✅ Output temp file deleted")
+        except Exception as cleanup_err:
+            print(f"   ⚠️ Output cleanup warning: {cleanup_err}")
+            
+        temp_url = f"{BASE_URL}/files/{extended_file_name}"
+        
+        print("\n" + "="*60)
+        print("🎉 PLATINUM EXTEND-AUDIO COMPLETED SUCCESSFULLY (FREE)")
+        print("="*60)
+        print(f"✅ Temp URL: {temp_url}")
+        print(f"✅ Actual Duration: {actual_duration:.0f}s")
+        print(f"✅ Target Label: {target_duration_label}")
+        print(f"✅ Loops Applied: {loops}")
+        print(f"✅ File Size: {file_size_mb:.1f} MB")
+        print(f"✅ Storage: Local (24h expiry)")
+        print("="*60)
+        
+        return {
+            "temp_url": temp_url,
+            "expires_in": 86400,
+            "actual_duration": int(actual_duration),
+            "target_label": target_duration_label,
+            "loops_applied": loops,
+            "storage": "local",
+            "message": "File will be deleted after 24 hours. Upgrade to VIP to save permanently.",
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("\n" + "="*60)
+        print("💥 PLATINUM EXTEND-AUDIO FAILED")
+        print("="*60)
+        print(f"❌ Error: {str(e)}")
+        print("="*60)
+        raise HTTPException(status_code=500, detail=f"Audio extension failed: {str(e)}")
 
 
 # ---------------------------------------------------
