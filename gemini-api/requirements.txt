@@ -14,6 +14,9 @@ google-genai>=1.47.0
 # Google OAuth2 for authentication
 google-auth>=2.16.0
 
+# Google Cloud Storage for large file serving
+google-cloud-storage>=2.10.0
+
 # Supabase database client
 supabase>=2.0.2
 
