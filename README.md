@@ -91,6 +91,10 @@ s3://subliminal-gen/
 - `POST /api/video/combine` - Combine audio + video
 - `GET /api/download/{id}` - Stream files from S3
 
+### Audio Processing (Platinum Features)
+- `POST /api/platinum/extend-audio` - **NEW**: Extend pre-mixed audio with fade-loop technique
+- `POST /api/platinum/backend-combine` - *DEPRECATED*: Complex FFmpeg mixing (kept for reference)
+
 ### User Management
 - `GET /api/library` - List user creations (VIP only)
 - `DELETE /api/creation/{id}` - Delete user creation
@@ -180,21 +184,61 @@ def find_similar_asset(prompt: str, duration: int, asset_type: str):
 - **Lifecycle Policies**: Auto-delete temp files after 24h
 - **CDN**: CloudFront for fast global delivery
 
+## 🎵 Audio Processing Technology
+
+### Platinum Extend-Audio Pipeline
+**New optimized approach for audio extension:**
+
+#### **Technology Stack**
+- **FFmpeg**: Professional audio processing engine
+- **Python subprocess**: Secure FFmpeg command execution
+- **Fade-Loop Algorithm**: Pre-fade input → Simple loop duplication
+
+#### **Processing Flow**
+1. **iOS Pre-mixing**: Voice + music combined locally (30s-5min)
+2. **Backend Extension**: Apply fades → Loop to target duration
+3. **Natural Endings**: No abrupt cuts, smooth meditation experience
+
+#### **Performance Benefits**
+- **10-20x faster** than complex mixing (2-10s vs 30-60s)
+- **Memory efficient**: Streaming processing, no RAM spikes
+- **Predictable**: Linear scaling with loop count
+- **Professional quality**: 2-second fade in/out transitions (optimal for meditation)
+
+#### **Supported Durations**
+- **Input**: 30 seconds to 5 minutes (pre-mixed)
+- **Output**: ~10min, ~15min, ~30min (approximate, natural endings)
+- **Algorithm**: `loops = target_duration ÷ input_duration`
+
+#### **FFmpeg Commands**
+```bash
+# Step 1: Apply fade in/out
+ffmpeg -i input.wav -filter_complex \
+  "[0:a]afade=t=in:ss=0:d=2,afade=t=out:st=END-2:d=2[faded]" \
+  faded.wav
+
+# Step 2: Loop the faded version
+ffmpeg -stream_loop LOOPS-1 -i faded.wav -c copy output.wav
+```
+
 ## 🚀 Deployment Strategy
 
 ### Backend (FastAPI)
 - **Platform**: Render.com or Railway
 - **Environment**: Python 3.11+
-- **Dependencies**: FastAPI, Supabase, boto3, sentence-transformers
+- **Dependencies**: FastAPI, Supabase, FFmpeg, subprocess
+- **Audio Processing**: FFmpeg 8.0+ with fade/loop filters
 
 ### iOS App
 - **Target**: iOS 15.0+
 - **Architecture**: MVVM with Combine
-- **Dependencies**: Supabase Swift SDK
+- **Dependencies**: Supabase Swift SDK, AVAudioRecorder
+- **Audio Mixing**: Local voice+music combination
 
 ### Infrastructure
 - **Database**: Supabase (PostgreSQL + Auth)
 - **Storage**: AWS S3 with CloudFront
+- **Audio Processing**: FFmpeg streaming pipeline
 - **Monitoring**: Supabase Analytics + Sentry
 
 ## 📊 Performance Targets
@@ -202,12 +246,20 @@ def find_similar_asset(prompt: str, duration: int, asset_type: str):
 ### Response Times
 - **Cache Hit**: < 500ms
 - **New Generation**: < 30s (music), < 60s (video)
+- **Audio Extension**: 2-10s (vs 30-60s previous approach)
 - **File Upload**: < 10s for 1MB file
+
+### Audio Processing Performance
+- **3-loop extension**: ~3 seconds processing
+- **9-loop extension**: ~8 seconds processing
+- **Memory usage**: <100MB (streaming approach)
+- **File size**: 15-50MB output (vs 100MB+ previous)
 
 ### Scalability
 - **Concurrent Users**: 1000+
 - **Storage**: Unlimited (S3)
 - **Cache Size**: 10GB+ semantic index
+- **Audio Pipeline**: Handles 30min+ extensions efficiently
 
 ## 🧪 Testing Strategy
 

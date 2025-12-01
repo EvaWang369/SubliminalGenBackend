@@ -840,7 +840,7 @@ async def extend_audio(
         print("\n🌊 STEP 4: Applying fade in/out...")
         faded_tmp_path = Path(tempfile.gettempdir()) / f"faded_{extended_file_id}.wav"
         
-        fade_duration = 4  # 4 second fades
+        fade_duration = 2  # 2 second fades (optimal for meditation)
         fade_out_start = max(0, input_duration - fade_duration)
         
         fade_cmd = [
@@ -855,7 +855,7 @@ async def extend_audio(
         ]
         
         print(f"   Fade in: 0-{fade_duration}s")
-        print(f"   Fade out: {fade_out_start}-{input_duration}s")
+        print(f"   Fade out: {fade_out_start:.1f}-{input_duration:.1f}s")
         print("   Running fade command...")
         
         try:
