@@ -39,8 +39,8 @@ uploads_dir.mkdir(exist_ok=True)
 
 app.mount("/files", StaticFiles(directory="uploads"), name="files")
 
-BASE_URL = os.getenv("BASE_URL", "http://0.0.0.0:8001")
-PORT = int(os.getenv("PORT", 8001))
+BASE_URL = os.getenv("BASE_URL", "http://0.0.0.0:8080")
+PORT = int(os.getenv("PORT", 8080))  # Cloud Run uses 8080
 
 # ---------------------------------------------------
 # SERVICES
@@ -996,6 +996,8 @@ async def extend_audio(
                         "target_label": target_duration_label,
                         "loops_applied": loops,
                         "storage": "cloud",
+                        "user_id": user_id,
+                        "file_id": extended_file_id,
                     }
                 else:
                     print("❌ STEP 9 FAILED: No data returned from database")
@@ -1046,6 +1048,8 @@ async def extend_audio(
             "target_label": target_duration_label,
             "loops_applied": loops,
             "storage": "local",
+            "user_id": user_id,
+            "file_id": extended_file_id,
             "message": "File will be deleted after 24 hours. Upgrade to VIP to save permanently.",
         }
         

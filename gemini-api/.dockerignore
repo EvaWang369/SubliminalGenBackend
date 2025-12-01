@@ -18,6 +18,22 @@ coverage.xml
 .mypy_cache
 .pytest_cache
 .hypothesis
-.DS_Store
+
+# Local uploads (will be recreated)
 uploads/*
 !uploads/.gitkeep
+
+# Environment files
+.env.local
+.env.development
+.env.test
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
