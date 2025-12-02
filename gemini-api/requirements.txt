@@ -17,6 +17,9 @@ google-auth>=2.16.0
 # Google Cloud Storage for large file serving
 google-cloud-storage>=2.10.0
 
+# Google Drive API for file storage
+google-api-python-client>=2.100.0
+
 # Supabase database client
 supabase>=2.0.2
 

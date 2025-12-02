@@ -399,7 +399,7 @@ async def extend_audio_endpoint(
     is_vip: str = Form("false"),
     title: str = Form(None),
 ):
-    """Platinum extend-audio endpoint - delegates to extend_audio_gcs function"""
+    """Platinum extend-audio endpoint - delegates to GCS storage"""
     return await extend_audio_gcs(
         combined_file=combined_file,
         loops=loops,

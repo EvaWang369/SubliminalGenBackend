@@ -3,6 +3,9 @@
 .env.local
 .env.production
 
+# Google service account credentials
+gemini-api/google_account/
+
 # Python
 __pycache__/
 *.pyc

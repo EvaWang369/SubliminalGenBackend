@@ -6,6 +6,9 @@ from pathlib import Path
 from google.cloud import storage
 from datetime import timedelta
 import os
+import json
+import base64
+from google.oauth2 import service_account
 
 
 async def extend_audio_gcs(
@@ -303,13 +306,21 @@ async def extend_audio_gcs(
         # ------------------------------------------------------------
         # 7. Upload to Google Cloud Storage (GCS)
         # ------------------------------------------------------------
-        bucket_name = os.getenv("GCS_TEMP_BUCKET", "subliminalgen-temp-files")
+        bucket_name = os.getenv("GCS_BUCKET_NAME", "subliminalgen-temp-files")
         gcs_file_name = f"extended/{user_id}/{uuid.uuid4()}.mp3"
 
         print(f"☁️ Uploading to GCS: gs://{bucket_name}/{gcs_file_name}")
 
         try:
-            client = storage.Client()
+            # Initialize GCS client with service account credentials
+            credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            if credentials_json:
+                credentials_info = json.loads(base64.b64decode(credentials_json))
+                credentials = service_account.Credentials.from_service_account_info(credentials_info)
+                client = storage.Client(credentials=credentials, project=credentials_info['project_id'])
+            else:
+                client = storage.Client()  # fallback to default credentials
+            
             bucket = client.bucket(bucket_name)
             blob = bucket.blob(gcs_file_name)
             blob.upload_from_string(result_bytes, content_type="audio/mpeg")
