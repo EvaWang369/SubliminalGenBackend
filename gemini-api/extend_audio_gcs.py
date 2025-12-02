@@ -17,7 +17,7 @@ async def extend_audio_gcs(
     title: str = Form(None),
 ):
     """
-    FINAL PRODUCTION VERSION (Cloud Run + GCS + iOS-safe WAV):
+    FINAL PRODUCTION VERSION (Cloud Run + GCS + MP3 320kbps):
 
     Flow:
       1. iOS uploads pre-mixed WAV (voice + music)
@@ -25,16 +25,13 @@ async def extend_audio_gcs(
          - probes duration with ffprobe
          - applies 2s fade-in + 2s fade-out
          - loops the faded clip N times
-      3. Result is encoded as:
-         - codec: pcm_s16le (16-bit PCM)
-         - sample rate: 44100 Hz
-         - channels: 2 (stereo)
-      4. Uploads to Google Cloud Storage
-      5. Returns a signed URL for iOS to download
+         - converts to MP3 320kbps
+      3. Uploads to Google Cloud Storage
+      4. Returns a signed URL for iOS to download
 
     Notes:
       - No local file streaming from Cloud Run → avoids 32MB limit
-      - Output WAV is maximally compatible (including iOS playback)
+      - Output MP3 is smaller and universally compatible
     """
 
     try:
@@ -205,7 +202,7 @@ async def extend_audio_gcs(
         print(f"✅ Looping done (loops={loops})")
 
         # ------------------------------------------------------------
-        # 5. Read final output bytes
+        # 5. Convert WAV to MP3 (320kbps default)
         # ------------------------------------------------------------
         if not output_path.exists():
             print("❌ Output file not created")
@@ -218,18 +215,96 @@ async def extend_audio_gcs(
                 pass
             raise HTTPException(status_code=500, detail="Output file not created")
 
-        result_bytes = output_path.read_bytes()
+        # Convert to MP3 320kbps (default)
+        mp3_output_path = Path(tempfile.gettempdir()) / f"extended_{uuid.uuid4()}.mp3"
+        print(f"🎵 Converting to MP3 320kbps: {mp3_output_path}")
+        
+        mp3_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(output_path),
+            "-codec:a", "libmp3lame",
+            "-b:a", "320k",  # 320kbps for high quality
+            "-ac", "2",
+            str(mp3_output_path)
+        ]
+        
+        # Alternative 256kbps for larger files (commented for now)
+        # mp3_cmd = [
+        #     "ffmpeg", "-y",
+        #     "-i", str(output_path),
+        #     "-codec:a", "libmp3lame",
+        #     "-b:a", "256k",  # 256kbps for better compression
+        #     "-ac", "2",
+        #     str(mp3_output_path)
+        # ]
+        
+        try:
+            mp3_proc = subprocess.run(
+                mp3_cmd,
+                capture_output=True,
+                check=True,
+                timeout=300,
+            )
+        except subprocess.CalledProcessError as e:
+            print("❌ MP3 conversion error")
+            print(e.stderr.decode("utf-8", errors="ignore")[-400:])
+            try:
+                if input_path.exists():
+                    input_path.unlink()
+                if faded_path.exists():
+                    faded_path.unlink()
+                if output_path.exists():
+                    output_path.unlink()
+                if mp3_output_path.exists():
+                    mp3_output_path.unlink()
+            except:
+                pass
+            raise HTTPException(status_code=500, detail="MP3 conversion failed")
+        except subprocess.TimeoutExpired:
+            print("❌ MP3 conversion timeout")
+            try:
+                if input_path.exists():
+                    input_path.unlink()
+                if faded_path.exists():
+                    faded_path.unlink()
+                if output_path.exists():
+                    output_path.unlink()
+                if mp3_output_path.exists():
+                    mp3_output_path.unlink()
+            except:
+                pass
+            raise HTTPException(status_code=500, detail="MP3 conversion timeout")
+
+        print("🎵 MP3 conversion completed")
+
+        # ------------------------------------------------------------
+        # 6. Read final MP3 output bytes
+        # ------------------------------------------------------------
+        if not mp3_output_path.exists():
+            print("❌ MP3 output file not created")
+            try:
+                if input_path.exists():
+                    input_path.unlink()
+                if faded_path.exists():
+                    faded_path.unlink()
+                if output_path.exists():
+                    output_path.unlink()
+            except:
+                pass
+            raise HTTPException(status_code=500, detail="MP3 output file not created")
+
+        result_bytes = mp3_output_path.read_bytes()
         final_size_mb = len(result_bytes) / (1024 * 1024)
         final_duration = dur * loops  # approximate (fades shorten a tiny bit)
 
         print(f"✨ Final duration ≈ {final_duration:.1f}s ({final_duration/60:.1f} min)")
-        print(f"📦 Final size ≈ {final_size_mb:.2f} MB")
+        print(f"📦 Final MP3 size ≈ {final_size_mb:.2f} MB (320kbps)")
 
         # ------------------------------------------------------------
-        # 6. Upload to Google Cloud Storage (GCS)
+        # 7. Upload to Google Cloud Storage (GCS)
         # ------------------------------------------------------------
         bucket_name = os.getenv("GCS_TEMP_BUCKET", "subliminalgen-temp-files")
-        gcs_file_name = f"extended/{user_id}/{uuid.uuid4()}.wav"
+        gcs_file_name = f"extended/{user_id}/{uuid.uuid4()}.mp3"
 
         print(f"☁️ Uploading to GCS: gs://{bucket_name}/{gcs_file_name}")
 
@@ -237,7 +312,7 @@ async def extend_audio_gcs(
             client = storage.Client()
             bucket = client.bucket(bucket_name)
             blob = bucket.blob(gcs_file_name)
-            blob.upload_from_string(result_bytes, content_type="audio/wav")
+            blob.upload_from_string(result_bytes, content_type="audio/mpeg")
         except Exception as e:
             print(f"❌ GCS upload failed: {e}")
             # cleanup temp files
@@ -248,37 +323,27 @@ async def extend_audio_gcs(
                     faded_path.unlink()
                 if output_path.exists():
                     output_path.unlink()
+                if mp3_output_path.exists():
+                    mp3_output_path.unlink()
             except:
                 pass
             raise HTTPException(status_code=500, detail=f"GCS upload failed: {str(e)}")
 
-        # Generate signed URL (default 1 hour)
+        # Generate signed URL for download (24 hours)
         try:
             signed_url = blob.generate_signed_url(
                 version="v4",
-                expiration=timedelta(hours=1),
-                method="GET",
-                response_disposition=f'attachment; filename="{Path(gcs_file_name).name}"',
+                expiration=timedelta(hours=24),
+                method="GET"
             )
         except Exception as e:
             print(f"❌ Signed URL generation failed: {e}")
-            # cleanup temp files (don’t delete from GCS, just fail API)
-            try:
-                if input_path.exists():
-                    input_path.unlink()
-                if faded_path.exists():
-                    faded_path.unlink()
-                if output_path.exists():
-                    output_path.unlink()
-            except:
-                pass
-            raise HTTPException(status_code=500, detail=f"Signed URL generation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail="Could not generate download URL")
 
-        print("🔐 Signed URL generated")
+        print(f"✅ Upload successful! Signed URL generated")
+        print(f"🔗 Download URL expires in 24 hours")
 
-        # ------------------------------------------------------------
-        # 7. Cleanup temp files
-        # ------------------------------------------------------------
+        # Cleanup temp files
         try:
             if input_path.exists():
                 input_path.unlink()
@@ -286,32 +351,39 @@ async def extend_audio_gcs(
                 faded_path.unlink()
             if output_path.exists():
                 output_path.unlink()
-        except Exception as cleanup_err:
-            print(f"⚠️ Temp cleanup warning: {cleanup_err}")
+            if mp3_output_path.exists():
+                mp3_output_path.unlink()
+        except Exception as e:
+            print(f"⚠️ Temp file cleanup warning: {e}")
 
-        # ------------------------------------------------------------
-        # 8. Final response
-        # ------------------------------------------------------------
-        print("\n" + "=" * 60)
         print("🎉 EXTEND-AUDIO COMPLETED SUCCESSFULLY")
         print("=" * 60)
 
         return {
+            "success": True,
+            "file_id": gcs_file_name.split("/")[-1].replace(".mp3", ""),
             "download_url": signed_url,
             "duration_seconds": int(final_duration),
-            "label": target_duration_label,
-            "loops": loops,
+            "duration_minutes": round(final_duration / 60, 1),
             "file_size_mb": round(final_size_mb, 2),
-            "storage": "gcs",
-            "expires_in_hours": 1,
-            "user_id": user_id,
-            "is_vip": is_vip_bool,
-            "title": title,
+            "format": "mp3",
+            "bitrate": "320kbps",
+            "loops": loops,
+            "expires_at": "24 hours"
         }
 
-    except HTTPException:
-        # just bubble up with its status code
-        raise
     except Exception as e:
-        print("💥 EXTEND-AUDIO ERROR:", str(e))
-        raise HTTPException(status_code=500, detail=f"extend_audio failed: {str(e)}")
+        print(f"❌ Unexpected error: {e}")
+        # Final cleanup attempt
+        try:
+            if 'input_path' in locals() and input_path.exists():
+                input_path.unlink()
+            if 'faded_path' in locals() and faded_path.exists():
+                faded_path.unlink()
+            if 'output_path' in locals() and output_path.exists():
+                output_path.unlink()
+            if 'mp3_output_path' in locals() and mp3_output_path.exists():
+                mp3_output_path.unlink()
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Audio processing failed: {str(e)}")
