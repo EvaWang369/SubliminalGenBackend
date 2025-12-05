@@ -461,7 +461,7 @@ async def delete_creation(creation_id: str, user_id: str):
         print(f"🗑 Deleting creation {creation_id} for user {user_id}")
         result = (
             music_service.supabase
-            .from_("user_creations")
+            .table("user_creations")
             .delete()
             .eq("id", creation_id)
             .eq("user_id", user_id)
