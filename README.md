@@ -65,7 +65,23 @@ CREATE TABLE user_creations (
 CREATE INDEX idx_user_creations ON user_creations (user_id, created_at DESC);
 ```
 
-## ☁️ S3 Storage Structure
+### Table: psyche_tracks (VIP only)
+```sql
+CREATE TABLE psyche_tracks (
+    id VARCHAR PRIMARY KEY,
+    title VARCHAR NOT NULL,
+    duration INTEGER NOT NULL,
+    tags JSON NOT NULL,
+    file_path VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_psyche_tracks_tags ON psyche_tracks USING GIN (tags);
+```
+
+## ☁️ Storage Structure
+
+### S3 (User Content)
 ```
 s3://subliminal-gen/
 ├── shared/                 # Reusable AI assets (all users)
@@ -80,6 +96,16 @@ s3://subliminal-gen/
 │       └── {user_id}/{id}.mp4
 └── temp/                   # 24h ephemeral (Free tier)
     └── {session_id}/
+```
+
+### Google Cloud Storage (Psyche Library)
+```
+gs://subliminalgen-psyche-tracks/
+├── track_001.mp3           # Queen Energy
+├── track_002.mp3           # Deep Focus
+├── track_003.mp3           # Inner Peace
+├── track_004.mp3           # Abundance Flow
+└── track_005.mp3           # Self Love
 ```
 
 ## 🔌 API Endpoints
@@ -99,6 +125,11 @@ s3://subliminal-gen/
 - `GET /api/library` - List user creations (VIP only)
 - `DELETE /api/creation/{id}` - Delete user creation
 - `GET /api/usage` - Get usage statistics
+
+### Psyche Library (VIP Only)
+- `GET /psyche-tracks` - Get all available psyche tracks
+- `GET /psyche-track/metadata/{id}` - Get single track metadata
+- `GET /psyche-track/download/{id}` - Download track audio file
 
 ## 📱 iOS App Structure
 
@@ -184,6 +215,44 @@ def find_similar_asset(prompt: str, duration: int, asset_type: str):
 - **Lifecycle Policies**: Auto-delete temp files after 24h
 - **CDN**: CloudFront for fast global delivery
 
+## 🎭 Psyche Library Architecture
+
+### Caching Strategy (iOS-Controlled)
+- **iOS owns caching**: Decides what to download and store locally
+- **Backend supports**: Provides metadata and signed URLs only
+- **Offline-first**: Downloaded tracks available without internet
+- **User-driven**: Explicit downloads, not automatic caching
+
+### Storage Flow
+```
+iOS → Backend (VIP check) → GCS (signed URL) → iOS (download & cache)
+```
+
+### Access Control
+- **VIP Verification**: All endpoints check VIP status via existing auth
+- **Signed URLs**: 1-hour temporary access to GCS files
+- **Private Bucket**: No public access, signed URLs only
+- **RLS Policies**: Database-level access control
+
+### Sample API Usage
+```bash
+# Get all tracks (VIP only)
+GET /psyche-tracks?user_id=vip-user-123
+
+# Response
+{
+  "tracks": [
+    {
+      "id": "track_001",
+      "title": "Queen Energy",
+      "duration": 180,
+      "tags": ["queen", "power", "confidence"],
+      "downloadURL": "https://storage.googleapis.com/subliminalgen-psyche-tracks/track_001.mp3?X-Goog-Algorithm=..."
+    }
+  ]
+}
+```
+
 ## 🎵 Audio Processing Technology
 
 ### Platinum Extend-Audio Pipeline
@@ -237,7 +306,7 @@ ffmpeg -stream_loop LOOPS-1 -i faded.wav -c copy output.wav
 
 ### Infrastructure
 - **Database**: Supabase (PostgreSQL + Auth)
-- **Storage**: AWS S3 with CloudFront
+- **Storage**: AWS S3 with CloudFront + Google Cloud Storage (Psyche)
 - **Audio Processing**: FFmpeg streaming pipeline
 - **Monitoring**: Supabase Analytics + Sentry
 

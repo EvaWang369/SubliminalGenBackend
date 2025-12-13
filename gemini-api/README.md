@@ -207,6 +207,10 @@ let simpleRequest = [
 ```  
 
 ## Deployment
+Google Cloud Run:
+https://console.cloud.google.com/run/detail/us-central1/subliminalgen-backend/observability/logs?project=avid-sphere-479819-v5
+Google Cloud Storage:
+https://console.cloud.google.com/storage/browser/subliminalgen-temp-files/extended/037b15a2-4c47-4473-9e6a-0e710c3c39a5;tab=objects?project=avid-sphere-479819-v5&pageState=(%22StorageObjectListTable%22:(%22f%22:%22%255B%255D%22))&prefix=&forceOnObjectsSortingFiltering=false
 
 **Render.com:**
 - Root Directory: `gemini-api`
