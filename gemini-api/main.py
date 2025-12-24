@@ -236,6 +236,96 @@ async def generate_music_direct(request: MusicGenerateRequest):
 
 
 # ---------------------------------------------------
+# UPLOAD PRE-COMBINED AUDIO (FRONTEND COMBINED)
+# ---------------------------------------------------
+@app.post("/api/audio/upload")
+async def upload_combined_audio(
+    combined_file: UploadFile = File(...),
+    user_id: str = Form(...),
+    creation_id: str = Form(...),
+    title: str = Form(...),
+    is_vip: str = Form("true"),
+):
+    """
+    Upload pre-combined audio file from VIP users only.
+    creation_id is provided by iOS client.
+    """
+    try:
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        if not creation_id:
+            raise HTTPException(status_code=400, detail="creation_id is required")
+        if not title:
+            raise HTTPException(status_code=400, detail="title is required")
+
+        print("📥 /api/audio/upload called (VIP only)")
+        print(f"   user_id     = {user_id}")
+        print(f"   creation_id = {creation_id}")
+        print(f"   title       = {title}")
+        print(f"   filename    = {combined_file.filename}")
+
+        combined_data = await combined_file.read()
+        if not combined_data:
+            raise HTTPException(status_code=400, detail="Empty combined_file")
+
+        # Upload to Supabase Storage using provided creation_id
+        file_path = f"vip/{user_id}/{creation_id}.wav"
+        print(f"☁️ Uploading to Supabase path: {file_path}")
+
+        upload_result = music_service.supabase.storage.from_("music").upload(
+            file_path,
+            combined_data,
+            {"content-type": "audio/wav"},
+        )
+        print(f"   Supabase upload result: {upload_result}")
+
+        # Get public URL
+        cloud_url = music_service.supabase.storage.from_("music").get_public_url(
+            file_path
+        )
+        print(f"   Public URL: {cloud_url}")
+
+        # Insert into database with provided creation_id
+        creation_data = {
+            "creation_id": creation_id,
+            "user_id": user_id,
+            "title": title,
+            "voice_url": None,
+            "combined_url": cloud_url,
+            "music_id": None,
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        print("🗄 Inserting into user_creations:", creation_data)
+
+        db_result = (
+            music_service.supabase
+            .from_("user_creations")
+            .insert(creation_data)
+            .execute()
+        )
+        print("   Supabase insert result:", db_result)
+
+        if getattr(db_result, "data", None):
+            return {
+                "url": cloud_url,
+                "creation_id": creation_id,
+            }
+        else:
+            print("❌ No data returned from Supabase user_creations insert")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to store creation in database",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Audio upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Audio upload failed: {str(e)}")
+
+
+# ---------------------------------------------------
 # EXTEND AUDIO (NEW PLATINUM FEATURE) - SIMPLE LOOP APPROACH
 # ---------------------------------------------------
 from extend_audio_gcs import extend_audio_gcs
