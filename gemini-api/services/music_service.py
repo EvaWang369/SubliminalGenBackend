@@ -109,40 +109,49 @@ class MusicService:
 
         print(f"🔑 Cache key: {cache_key} for tag: {tag}")
 
-        # 1️⃣ Fetch user progress
-        try:
-            user_resp = self.supabase.table("music_users").select("*").eq("user_id", user_id).execute()
-            user_row = user_resp.data[0] if user_resp.data else None
-            last_received_uuid = user_row.get("last_received_uuid") if user_row else None
-        except Exception as e:
-            print(f"⚠️ User lookup failed: {e}")
-            last_received_uuid = None
+        # TODO: Implement smart caching logic
+        # - Add time-based filtering (24-48h cooldown)
+        # - Track multiple recent UUIDs per user
+        # - Consider user listening history
+        # - Implement cache hit rate optimization
+        
+        # TEMPORARILY DISABLED: Always generate new music
+        # Will re-enable after improving deduplication logic
+        
+        # # 1️⃣ Fetch user progress
+        # try:
+        #     user_resp = self.supabase.table("music_users").select("*").eq("user_id", user_id).execute()
+        #     user_row = user_resp.data[0] if user_resp.data else None
+        #     last_received_uuid = user_row.get("last_received_uuid") if user_row else None
+        # except Exception as e:
+        #     print(f"⚠️ User lookup failed: {e}")
+        #     last_received_uuid = None
+        #
+        # # 2️⃣ Try cached tracks (same metadata)
+        # try:
+        #     cached_resp = self.supabase.table("music").select("*").eq("cache_key", cache_key).eq("tag", tag).order("uuid").execute()
+        #     cached_tracks = cached_resp.data or []
+        # except Exception as e:
+        #     print(f"⚠️ Cache lookup failed: {e}")
+        #     cached_tracks = []
+        #
+        # for track in cached_tracks:
+        #     if track["uuid"] != last_received_uuid:
+        #         await self._update_user(user_id, track["uuid"])
+        #         return self._response(track, cached=True)
+        #
+        # # 3️⃣ Cached exhausted → sequential by tag
+        # next_track = await self._get_next_by_tag(
+        #     user_id=user_id,
+        #     tag=tag,
+        #     exclude_uuids=[t["uuid"] for t in cached_tracks],
+        #     last_uuid=last_received_uuid
+        # )
+        #
+        # if next_track:
+        #     return self._response(next_track, cached=True)
 
-        # 2️⃣ Try cached tracks (same metadata)
-        try:
-            cached_resp = self.supabase.table("music").select("*").eq("cache_key", cache_key).eq("tag", tag).order("uuid").execute()
-            cached_tracks = cached_resp.data or []
-        except Exception as e:
-            print(f"⚠️ Cache lookup failed: {e}")
-            cached_tracks = []
-
-        for track in cached_tracks:
-            if track["uuid"] != last_received_uuid:
-                await self._update_user(user_id, track["uuid"])
-                return self._response(track, cached=True)
-
-        # 3️⃣ Cached exhausted → sequential by tag
-        next_track = await self._get_next_by_tag(
-            user_id=user_id,
-            tag=tag,
-            exclude_uuids=[t["uuid"] for t in cached_tracks],
-            last_uuid=last_received_uuid
-        )
-
-        if next_track:
-            return self._response(next_track, cached=True)
-
-        # 4️⃣ Nothing left → generate new
+        # Generate new music every time (temporary)
         return await self._generate_new(
             user_id=user_id,
             prompt=request.prompt,

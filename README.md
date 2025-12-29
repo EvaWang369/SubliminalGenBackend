@@ -111,7 +111,8 @@ gs://subliminalgen-psyche-tracks/
 ## 🔌 API Endpoints
 
 ### Core Generation
-- `POST /api/music/generate` - Generate AI music with semantic caching
+- `POST /api/music/{user_id}` - **ACTIVE**: Generate AI music with state modifiers (caching temporarily disabled)
+- `POST /api/music/generate` - **DEPRECATED**: Direct generation (unused by frontend)
 - `POST /api/video/generate` - Generate AI video with semantic caching
 - `POST /api/audio/combine` - Combine voice + music
 - `POST /api/video/combine` - Combine audio + video
@@ -162,6 +163,51 @@ SubliminalGenApp/
 - **Semantic Caching**: Local cache for generated assets
 - **Two-Tier Storage**: Free (local) vs VIP (cloud)
 - **Background Processing**: Combine operations in background
+
+## 🎵 Music Generation with State Modifiers
+
+### State Prompt Enhancement
+**NEW FEATURE**: Identity states are converted to descriptive presence text for richer music generation.
+
+#### Available State Modifiers
+```python
+STATE_PROMPT_MODIFIERS = {
+    "powerful": "confident, expansive, grounded presence",
+    "determined": "focused, steady, forward-moving energy", 
+    "freedom": "open, spacious, unrestricted flow",
+    "dreamy": "ethereal, floating, slow-evolving textures"
+}
+```
+
+#### Sample Request
+```bash
+POST /api/music/user123
+{
+  "prompt": "peaceful meditation music",
+  "music_type": ["powerful", "dreamy"],
+  "mood": ["calm"],
+  "tag": "meditation",
+  "duration": 30
+}
+```
+
+#### Enhanced Prompt to Lyria
+```
+"peaceful meditation music, presence: confident, expansive, grounded presence, ethereal, floating, slow-evolving textures, style: powerful, dreamy, mood: calm"
+```
+
+### Current Status: Caching Disabled
+**TEMPORARY**: All requests generate fresh music via Lyria API
+- **Reason**: Improving deduplication logic to prevent old track returns
+- **Impact**: Higher API costs, always unique music
+- **Timeline**: Cache will be re-enabled with time-based filtering
+
+#### TODO: Smart Caching Implementation
+- [ ] Time-based filtering (24-48h cooldown)
+- [ ] Track multiple recent UUIDs per user
+- [ ] Consider user listening history  
+- [ ] Implement cache hit rate optimization
+- [ ] Add user preference-based deduplication
 
 ## 🧠 Semantic Caching Logic
 

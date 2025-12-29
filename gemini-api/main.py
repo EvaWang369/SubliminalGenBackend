@@ -188,50 +188,51 @@ async def generate_music_for_user(user_id: str, request: MusicGenerateRequest):
 
 
 # ---------------------------------------------------
-# DIRECT MUSIC GENERATION (LOCAL FILE)
+# DIRECT MUSIC GENERATION (LOCAL FILE) - UNUSED
 # ---------------------------------------------------
-@app.post("/api/music/generate", response_model=GenerationResponse)
-async def generate_music_direct(request: MusicGenerateRequest):
-    """
-    Direct music generation with enhanced prompts (local storage, no caching).
-    """
-    try:
-        enhanced_prompt = music_service.enhance_prompt(
-            request.prompt,
-            request.music_type,
-            request.instruments,
-            request.mood,
-            request.frequencies,
-        )
-
-        print(f"🎵 Direct generation with enhanced prompt: {enhanced_prompt}")
-
-        audio_data = await music_generator.generate_music_with_config(
-            enhanced_prompt,
-            request.tag,
-        )
-
-        file_id = str(uuid.uuid4())
-        file_path = uploads_dir / f"{file_id}.wav"
-
-        with open(file_path, "wb") as f:
-            f.write(audio_data)
-
-        file_url = f"{BASE_URL}/files/{file_id}.wav"
-
-        return GenerationResponse(
-            id=file_id,
-            file_url=file_url,
-            cached=False,
-            duration=request.duration,
-        )
-
-    except Exception as e:
-        print(f"❌ Music generation failed: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Music generation failed: {str(e)}",
-        )
+# @app.post("/api/music/generate", response_model=GenerationResponse)
+# async def generate_music_direct(request: MusicGenerateRequest):
+#     """
+#     Direct music generation with enhanced prompts (local storage, no caching).
+#     DEPRECATED: Frontend uses /api/music/{user_id} instead
+#     """
+#     try:
+#         enhanced_prompt = music_service.enhance_prompt(
+#             request.prompt,
+#             request.music_type,
+#             request.instruments,
+#             request.mood,
+#             request.frequencies,
+#         )
+# 
+#         print(f"🎵 Direct generation with enhanced prompt: {enhanced_prompt}")
+# 
+#         audio_data = await music_generator.generate_music_with_config(
+#             enhanced_prompt,
+#             request.tag,
+#         )
+# 
+#         file_id = str(uuid.uuid4())
+#         file_path = uploads_dir / f"{file_id}.wav"
+# 
+#         with open(file_path, "wb") as f:
+#             f.write(audio_data)
+# 
+#         file_url = f"{BASE_URL}/files/{file_id}.wav"
+# 
+#         return GenerationResponse(
+#             id=file_id,
+#             file_url=file_url,
+#             cached=False,
+#             duration=request.duration,
+#         )
+# 
+#     except Exception as e:
+#         print(f"❌ Music generation failed: {str(e)}")
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Music generation failed: {str(e)}",
+#         )
 
 
 
