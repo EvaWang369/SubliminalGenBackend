@@ -175,7 +175,7 @@ DEBUG=true
 
 **Production Endpoint:**
 ```
-POST https://subliminalgenbackend.onrender.com/api/music/{user_id}
+POST https://subliminalgen-backend-4rcfnc5cqq-uc.a.run.app/api/music/{user_id}
 ```
 
 **iOS Request Examples:**
@@ -212,11 +212,15 @@ https://console.cloud.google.com/run/detail/us-central1/subliminalgen-backend/ob
 Google Cloud Storage:
 https://console.cloud.google.com/storage/browser/subliminalgen-temp-files/extended/037b15a2-4c47-4473-9e6a-0e710c3c39a5;tab=objects?project=avid-sphere-479819-v5&pageState=(%22StorageObjectListTable%22:(%22f%22:%22%255B%255D%22))&prefix=&forceOnObjectsSortingFiltering=false
 
-**Render.com:**
-- Root Directory: `gemini-api`
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `python main.py`
-- Environment Variables: `BASE_URL=https://subliminalgenbackend.onrender.com`
+[//]: # (**Render.com:**)
+
+[//]: # (- Root Directory: `gemini-api`)
+
+[//]: # (- Build Command: `pip install -r requirements.txt`)
+
+[//]: # (- Start Command: `python main.py`)
+
+[//]: # (- Environment Variables: `BASE_URL=https://subliminalgenbackend.onrender.com`)
 
 **Local Development:**
 ```bash
@@ -245,7 +249,7 @@ https://ai.google.dev/gemini-api/docs/music-generation?utm_source=deepmind.googl
 
 VIP User Test (60s duration):
 ```
-curl -X POST https://subliminalgenbackend.onrender.com/api/music/550e8400-e29b-41d4-a716-446655440000 \
+curl -X POST https://subliminalgen-backend-4rcfnc5cqq-uc.a.run.app/api/music/550e8400-e29b-41d4-a716-446655440000 \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "relaxing piano music",
@@ -260,7 +264,7 @@ curl -X POST https://subliminalgenbackend.onrender.com/api/music/550e8400-e29b-4
 
 Free User Test (30s duration cap):
 ```
-curl -X POST https://subliminalgenbackend.onrender.com/api/music/550e8400-e29b-41d4-a716-446655440000 \
+curl -X POST https://subliminalgen-backend-4rcfnc5cqq-uc.a.run.app/api/music/550e8400-e29b-41d4-a716-446655440000 \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "energetic workout music",
@@ -272,7 +276,7 @@ curl -X POST https://subliminalgenbackend.onrender.com/api/music/550e8400-e29b-4
 
 Health Check:
 ```
-curl https://subliminalgenbackend.onrender.com/
+curl https://subliminalgen-backend-4rcfnc5cqq-uc.a.run.app/health
 
 ```
 

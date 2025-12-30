@@ -14,7 +14,7 @@ from datetime import timedelta
 from services.music_service import MusicService
 from services.lyria_music import LyriaMusic
 from services.auth_service import AuthService
-from models.requests import MusicGenerateRequest, SignUpRequest, SignInRequest, GoogleAuthRequest, VIPStatusRequest
+from models.requests import MusicGenerateRequest, SignUpRequest, SignInRequest, GoogleAuthRequest, VIPStatusRequest, ResetPasswordRequest, UpdatePasswordRequest
 from models.responses import GenerationResponse, LibraryResponse, UserCreation, AuthResponse
 from models.psyche_models import PsycheTracksResponse, PsycheTrack
 
@@ -121,6 +121,35 @@ async def sign_in_with_google(request: GoogleAuthRequest):
     except Exception as e:
         print(f"💥 Google signin error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Google sign in failed: {str(e)}")
+
+
+@app.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Send password reset email"""
+    try:
+        success = await auth_service.reset_password(request.email)
+        if success:
+            return {"message": "If an account with that email exists, a reset link has been sent"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to process reset request")
+    except Exception as e:
+        print(f"💥 Reset password error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process reset request")
+
+
+@app.post("/auth/update-password")
+async def update_password(request: UpdatePasswordRequest):
+    """Update user password directly"""
+    try:
+        success = await auth_service.update_password(request.email, request.new_password)
+        if success:
+            return {"message": "Password updated successfully"}
+    except ValueError as e:
+        print(f"❌ Update password failed: {request.email} - {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"💥 Update password error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update password")
 
 
 @app.post("/user/vip-status", response_model=AuthResponse)

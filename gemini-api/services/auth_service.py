@@ -211,3 +211,64 @@ class AuthService:
             
         except Exception as e:
             raise ValueError(f"Get user profile failed: {str(e)}")
+    
+    async def reset_password(self, email: str) -> bool:
+        """Send password reset email (placeholder - integrate with email service)"""
+        try:
+            # Check if user exists
+            result = self.supabase.from_("music_users").select("email").eq("email", email).execute()
+            
+            if not result.data:
+                # Don't reveal if email exists for security
+                return True
+            
+            # Generate reset token
+            import secrets
+            reset_token = secrets.token_urlsafe(32)
+            
+            # Store token in database (expires in 1 hour)
+            from datetime import datetime, timedelta
+            expires_at = datetime.now() + timedelta(hours=1)
+            
+            # TODO: Create password_reset_tokens table first
+            # self.supabase.from_("password_reset_tokens").insert({
+            #     "email": email,
+            #     "token": reset_token,
+            #     "expires_at": expires_at.isoformat()
+            # }).execute()
+            
+            # TODO: Send actual email
+            print(f"🔑 Password reset requested for: {email}")
+            print(f"📧 Reset token: {reset_token} (expires: {expires_at})")
+            print(f"📧 TODO: Send email with link: https://yourapp.com/reset?token={reset_token}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Reset password error: {str(e)}")
+            return False
+    
+    async def update_password(self, email: str, new_password: str) -> bool:
+        """Update user password directly"""
+        try:
+            # Check if user exists
+            result = self.supabase.from_("music_users").select("user_id").eq("email", email).execute()
+            
+            if not result.data:
+                raise ValueError("User not found")
+            
+            # Update password
+            new_password_hash = self.hash_password(new_password)
+            update_result = self.supabase.from_("music_users").update({
+                "password_hash": new_password_hash
+            }).eq("email", email).execute()
+            
+            if update_result.data:
+                print(f"✅ Password updated for: {email}")
+                return True
+            else:
+                raise ValueError("Failed to update password")
+            
+        except Exception as e:
+            print(f"❌ Update password error: {str(e)}")
+            raise ValueError(f"Update password failed: {str(e)}")

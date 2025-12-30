@@ -45,6 +45,13 @@ class SignInRequest(BaseModel):
 class GoogleAuthRequest(BaseModel):
     id_token: str
 
+class ResetPasswordRequest(BaseModel):
+    email: str
+
+class UpdatePasswordRequest(BaseModel):
+    email: str
+    new_password: str
+
 class VIPStatusRequest(BaseModel):
     user_id: str
     transaction_id: str
