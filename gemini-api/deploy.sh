@@ -30,8 +30,8 @@ gcloud run deploy $SERVICE_NAME \
   --port 8080
 
 echo "✅ Deployment complete!"
-echo "🌐 Service URL: https://$SERVICE_NAME-311287456014.$REGION.run.app"
+echo "🌐 Service URL: $(gcloud run services describe $SERVICE_NAME --region=$REGION --format='value(status.url)')"
 echo ""
 echo "🧪 Test endpoints:"
-echo "curl https://$SERVICE_NAME-311287456014.$REGION.run.app/"
-echo "curl https://$SERVICE_NAME-311287456014.$REGION.run.app/health"
+echo "curl $(gcloud run services describe $SERVICE_NAME --region=$REGION --format='value(status.url)')/"
+echo "curl $(gcloud run services describe $SERVICE_NAME --region=$REGION --format='value(status.url)')/health"

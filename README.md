@@ -292,11 +292,43 @@ GET /psyche-tracks?user_id=vip-user-123
       "id": "track_001",
       "title": "Queen Energy",
       "duration": 180,
-      "tags": ["queen", "power", "confidence"],
-      "downloadURL": "https://storage.googleapis.com/subliminalgen-psyche-tracks/track_001.mp3?X-Goog-Algorithm=..."
+      "tags": ["queen", "power", "confidence"]
     }
   ]
 }
+```
+
+### 🔧 Adding New Psyche Tracks
+
+#### Method 1: Automated Script (Recommended)
+```bash
+# Use the admin script
+python add_psyche_track.py track_007.m4a "Confidence Boost" 240 "confidence,power,success"
+```
+
+#### Method 2: Manual Process
+**Step 1: Upload to Google Cloud Storage**
+```bash
+gsutil cp new_track.m4a gs://subliminalgen-temp-files/psyche-tracks/track_006.m4a
+```
+
+**Step 2: Add to Database**
+```sql
+INSERT INTO psyche_tracks (id, title, duration, tags, file_path) VALUES
+('track_006', 'New Track Title', 240, '["tag1", "tag2", "tag3"]', 'track_006.m4a');
+```
+
+#### File Requirements
+- **Format**: M4A (AAC codec, 128kbps) - optimized for iOS
+- **Naming**: `track_XXX.m4a` (sequential numbering)
+- **Duration**: Accurate duration in seconds
+- **Tags**: JSON array of relevant keywords
+
+#### Verification
+```bash
+# Test the new track
+curl "https://your-api.com/psyche-tracks?user_id=vip-user-id"
+curl "https://your-api.com/psyche-track/download/track_006?user_id=vip-user-id"
 ```
 
 ## 🎵 Audio Processing Technology
@@ -400,3 +432,22 @@ ffmpeg -stream_loop LOOPS-1 -i faded.wav -c copy output.wav
 - **Edge Caching**: Redis for faster lookups
 - **Streaming**: Real-time audio/video processing
 - **ML Models**: On-device voice enhancement
+
+## 🛠️ Admin Tools
+
+### Psyche Library Management
+- **add_psyche_track.py**: Automated script for adding new tracks
+- **database_psyche_setup.sql**: Initial database schema and sample data
+- **test_psyche_endpoints.py**: Comprehensive API testing suite
+
+### Usage Examples
+```bash
+# Add new track
+python add_psyche_track.py track_008.m4a "Deep Sleep" 300 "sleep,relaxation,peace"
+
+# Test all endpoints
+python test_psyche_endpoints.py
+
+# Setup database (first time)
+psql -h supabase-host -d postgres -f database_psyche_setup.sql
+```
