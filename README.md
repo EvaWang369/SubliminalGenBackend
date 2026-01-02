@@ -65,6 +65,15 @@ CREATE TABLE user_creations (
 CREATE INDEX idx_user_creations ON user_creations (user_id, created_at DESC);
 ```
 
+### Table: psyche_tracks_version (NEW)
+```sql
+CREATE TABLE psyche_tracks_version (
+    id TEXT PRIMARY KEY DEFAULT 'psyche_tracks',
+    version INTEGER NOT NULL DEFAULT 1,
+    last_updated TIMESTAMP DEFAULT NOW()
+);
+```
+
 ### Table: psyche_tracks (VIP only)
 ```sql
 CREATE TABLE psyche_tracks (
@@ -128,6 +137,7 @@ gs://subliminalgen-psyche-tracks/
 - `GET /api/usage` - Get usage statistics
 
 ### Psyche Library (VIP Only)
+- `GET /psyche-tracks/meta` - **NEW**: Get library version metadata (lightweight)
 - `GET /psyche-tracks` - Get all available psyche tracks
 - `GET /psyche-track/metadata/{id}` - Get single track metadata
 - `GET /psyche-track/download/{id}` - Download track audio file
@@ -263,6 +273,32 @@ def find_similar_asset(prompt: str, duration: int, asset_type: str):
 
 ## 🎭 Psyche Library Architecture
 
+### **NEW: Smart Update System**
+**Minimal refresh with user control:**
+- **Version Tracking**: Global library version in `psyche_tracks_version` table
+- **Auto-bump**: Script increments version when adding tracks
+- **Smart Detection**: iOS checks version on app launch/foreground
+- **User Control**: Refresh indicator appears only when updates available
+- **Offline-first**: Strong offline playback, optional refresh
+
+#### Update Flow
+```
+1. Admin adds track → Script bumps version
+2. iOS checks /psyche-tracks/meta → Detects version change
+3. Shows refresh indicator → User decides when to update
+4. User taps refresh → Downloads fresh library
+```
+
+#### API Endpoints
+```bash
+# Lightweight version check
+GET /psyche-tracks/meta?user_id=vip-user
+# Response: {"version": 5, "last_updated": "2025-01-01T10:00:00Z"}
+
+# Full library (when refreshing)
+GET /psyche-tracks?user_id=vip-user
+```
+
 ### Caching Strategy (iOS-Controlled)
 - **iOS owns caching**: Decides what to download and store locally
 - **Backend supports**: Provides metadata and signed URLs only
@@ -302,8 +338,9 @@ GET /psyche-tracks?user_id=vip-user-123
 
 #### Method 1: Automated Script (Recommended)
 ```bash
-# Use the admin script
+# Use the admin script - automatically bumps library version
 python add_psyche_track.py track_007.m4a "Confidence Boost" 240 "confidence,power,success"
+# → Uploads file → Adds to DB → Bumps version → Triggers iOS refresh indicator
 ```
 
 #### Method 2: Manual Process
@@ -316,6 +353,38 @@ gsutil cp new_track.m4a gs://subliminalgen-temp-files/psyche-tracks/track_006.m4
 ```sql
 INSERT INTO psyche_tracks (id, title, duration, tags, file_path) VALUES
 ('track_006', 'New Track Title', 240, '["tag1", "tag2", "tag3"]', 'track_006.m4a');
+```
+
+### 🔄 Updating Existing Music Content
+
+#### Option 1: Replace with New Track IDs (Recommended)
+```bash
+# Add new track with updated content
+python add_psyche_track.py new_music.m4a "Queen Energy v2" 180 "queen,power,confidence"
+# Creates track_006, track_007, etc.
+
+# Remove old track from database
+DELETE FROM psyche_tracks WHERE id = 'track_001';
+```
+
+#### Option 2: Replace Files in GCS (Keep Same IDs)
+```bash
+# Upload new music with same filename
+gsutil cp updated_music.m4a gs://subliminalgen-temp-files/psyche-tracks/track_001.m4a
+
+# Manually bump version to trigger iOS refresh
+python bump_library_version.py
+```
+
+**⚠️ Important:** Option 1 is recommended to avoid iOS caching conflicts. When music content changes, create new track IDs rather than replacing existing files.
+
+### 🔧 Manual Version Bump
+
+When you update music files without using the automated script:
+```bash
+# Bump library version manually
+python bump_library_version.py
+# → Increments version → Triggers iOS refresh indicator
 ```
 
 #### File Requirements
@@ -437,6 +506,7 @@ ffmpeg -stream_loop LOOPS-1 -i faded.wav -c copy output.wav
 
 ### Psyche Library Management
 - **add_psyche_track.py**: Automated script for adding new tracks
+- **bump_library_version.py**: Manual version bump when updating existing music
 - **database_psyche_setup.sql**: Initial database schema and sample data
 - **test_psyche_endpoints.py**: Comprehensive API testing suite
 
@@ -444,6 +514,13 @@ ffmpeg -stream_loop LOOPS-1 -i faded.wav -c copy output.wav
 ```bash
 # Add new track
 python add_psyche_track.py track_008.m4a "Deep Sleep" 300 "sleep,relaxation,peace"
+
+# Update existing music (recommended approach)
+python add_psyche_track.py new_music.m4a "Queen Energy v2" 180 "queen,power,confidence"
+# Then delete old track: DELETE FROM psyche_tracks WHERE id = 'track_001';
+
+# Manual version bump (when updating files directly)
+python bump_library_version.py
 
 # Test all endpoints
 python test_psyche_endpoints.py

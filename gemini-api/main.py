@@ -501,6 +501,24 @@ async def download_file(file_id: str):
 # ---------------------------------------------------
 # PSYCHE LIBRARY (VIP ONLY)
 # ---------------------------------------------------
+@app.get("/psyche-tracks/meta")
+async def get_library_meta(user_id: str):
+    """Get library version metadata (VIP only)"""
+    try:
+        # VIP check
+        user_data = await auth_service.get_user_profile(user_id)
+        if not user_data.get('isVIP', False):
+            raise HTTPException(status_code=403, detail={"error": "VIP_REQUIRED", "message": "Psyche Library requires VIP subscription"})
+        
+        # Get version
+        response = music_service.supabase.table("psyche_tracks_version").select("version,last_updated").single().execute()
+        return response.data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get library metadata: {str(e)}")
+
 @app.get("/psyche-tracks", response_model=PsycheTracksResponse)
 async def get_psyche_tracks(user_id: str):
     """Get all available psyche tracks (VIP only)"""
